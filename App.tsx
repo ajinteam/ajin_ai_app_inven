@@ -6,8 +6,8 @@ import ItemDetailModal from './components/ItemDetailModal';
 import { PlusIcon, BoxIcon, SearchIcon, TrashIcon, DownloadIcon, CloudIcon, ServerIcon, SyncIcon } from './components/icons';
 
 const STORAGE_KEY = 'inventory_system_data_v2';
-const ADMIN_PASSWORD = '0000';
-const PRODUCT_ONLY_PASSWORD = '1111';
+const ADMIN_PASSWORD = '5200';
+const PRODUCT_ONLY_PASSWORD = '3281';
 
 const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
@@ -268,7 +268,7 @@ const App: React.FC = () => {
             <div className="bg-indigo-600 p-4 rounded-2xl shadow-lg mb-6">
               <BoxIcon className="w-10 h-10 text-white" />
             </div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase text-center">재고 관리 시스템</h1>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase text-center">Ajin 재고 관리 시스템</h1>
             <p className="text-[10px] text-slate-400 font-black mt-2 tracking-widest uppercase">Vercel KV Cloud Infrastructure</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
@@ -293,7 +293,7 @@ const App: React.FC = () => {
                 <div className="flex items-center space-x-4">
                     <BoxIcon className="h-8 w-8 text-indigo-600" />
                     <div>
-                      <h1 className="text-2xl font-bold text-slate-900 tracking-tight uppercase">재고 관리 시스템</h1>
+                      <h1 className="text-2xl font-bold text-slate-900 tracking-tight uppercase">Ajin 재고 관리 시스템</h1>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${dataSource === 'cloud' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
                           {dataSource === 'cloud' ? <ServerIcon className="w-2.5 h-2.5" /> : <BoxIcon className="w-2.5 h-2.5" />}
