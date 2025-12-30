@@ -1,8 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Item, Transaction } from '../types';
-// Fix: Added PlusIcon to imports
-import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, TrashIcon, DownloadIcon, PlusIcon } from './icons';
+import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, TrashIcon, DownloadIcon, PlusIcon, SyncIcon } from './icons';
 
 interface ItemDetailModalProps {
   item: Item;
@@ -25,7 +24,7 @@ const suggestNextSerial = (usedSerials: string[]): string => {
   let maxNum = 0;
   let currentPrefix = 'SN';
   usedSerials.forEach(s => {
-    const match = s.match(regex);
+    const match = s.toUpperCase().match(regex);
     if (match) {
       currentPrefix = match[1];
       const num = parseInt(match[2], 10);
@@ -86,6 +85,20 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     });
   }, [item]);
 
+  // Handle Serial Range to Quantity conversion
+  useEffect(() => {
+    if (item.type === 'product' && serialNumber.includes('~')) {
+      try {
+        const range = parseSerialRange(serialNumber.toUpperCase());
+        if (range.length > 1) {
+          setQuantity(range.length.toString());
+        }
+      } catch (e) {
+        // Range too large or invalid, ignore for auto-quantity
+      }
+    }
+  }, [serialNumber, item.type]);
+
   const currentStock = useMemo(() => item.transactions.reduce((acc, t) => t.type === 'purchase' ? acc + t.quantity : acc - t.quantity, 0), [item.transactions]);
   const isSerialDuplicate = useMemo(() => (!serialNumber.trim() || serialNumber.includes('~')) ? false : allUsedSerials.includes(serialNumber.toUpperCase()), [serialNumber, allUsedSerials]);
   const isCodeDuplicate = useMemo(() => (!editFormData.code || editFormData.code === item.code) ? false : existingCodes.some(c => c.toUpperCase() === editFormData.code?.toUpperCase()), [editFormData.code, existingCodes, item.code]);
@@ -95,20 +108,37 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     let targetSerials: string[] = [serialNumber.toUpperCase().trim()];
     let isRange = false;
     if (item.type === 'product' && serialNumber.includes('~')) {
-      try { targetSerials = parseSerialRange(serialNumber.toUpperCase()); isRange = true; } catch (err: any) { alert(err.message); return; }
+      try { 
+        targetSerials = parseSerialRange(serialNumber.toUpperCase()); 
+        isRange = true; 
+      } catch (err: any) { 
+        alert(err.message); 
+        return; 
+      }
     }
+    
     const duplicates = targetSerials.filter(s => !!s && allUsedSerials.includes(s));
     if (duplicates.length > 0) { alert(`중복 번호 존재: ${duplicates.slice(0, 5).join(', ')}...`); return; }
+    
     const count = isRange ? targetSerials.length : (parseInt(quantity, 10) || 0);
     if (count <= 0) { alert('수량을 확인하세요.'); return; }
     if (transactionType === 'release' && count > currentStock) { alert('재고 부족!'); return; }
+    
     if (isRange) {
       targetSerials.forEach(s => onAddTransaction(item.id, { type: transactionType, quantity: 1, date: new Date().toISOString(), remarks: transRemarks, modelName: transModelName, userId: transUserId, serialNumber: s, customerName, address, phoneNumber }));
-      alert(`${targetSerials.length}건 등록 완료.`);
+      alert(`${targetSerials.length}건이 일련번호 기반으로 자동 등록되었습니다.`);
     } else {
       onAddTransaction(item.id, { type: transactionType, quantity: count, date: new Date().toISOString(), remarks: transRemarks, modelName: transModelName, userId: transUserId, serialNumber: item.type === 'product' ? serialNumber.toUpperCase() : '', customerName: item.type === 'product' ? customerName : '', address: item.type === 'product' ? address : '', phoneNumber: item.type === 'product' ? phoneNumber : '' });
     }
-    setQuantity(''); setTransRemarks(''); setTransModelName(''); setTransUserId(''); setSerialNumber(suggestNextSerial([...allUsedSerials, ...targetSerials])); setCustomerName(''); setAddress(''); setPhoneNumber('');
+    
+    setQuantity(''); 
+    setTransRemarks(''); 
+    setTransModelName(''); 
+    setTransUserId(''); 
+    setSerialNumber(suggestNextSerial([...allUsedSerials, ...targetSerials])); 
+    setCustomerName(''); 
+    setAddress(''); 
+    setPhoneNumber('');
   };
   
   const handleActionConfirm = () => {
@@ -134,7 +164,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setTransEditData(prev => ({ ...prev, [name]: processedValue }));
   };
 
-  // Fix: Implemented missing transaction handlers
   const handleEditTransaction = (t: Transaction) => {
     setEditingTransactionId(t.id);
     setTransEditData(t);
@@ -247,13 +276,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                           <>
                             <div className="relative">
                                 <div className="flex justify-between items-center mb-2">
-                                  <label className="text-xs font-black uppercase text-slate-400 tracking-widest">일련번호</label>
+                                  <label className="text-xs font-black uppercase text-slate-400 tracking-widest">일련번호 (범위입력: ~ )</label>
                                   <button type="button" onClick={() => setSerialNumber(suggestNextSerial(allUsedSerials))} className="text-[10px] font-black text-indigo-600 underline">다음번호 제안</button>
                                 </div>
-                                <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="SN-00000" className={`w-full px-4 py-3 text-lg border-2 rounded-xl font-black outline-none focus:ring-4 ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
+                                <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="예: AJP00001~00005" className={`w-full px-4 py-3 text-lg border-2 rounded-xl font-black outline-none focus:ring-4 ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
+                                {serialNumber.includes('~') && (
+                                  <p className="text-[10px] font-black text-indigo-500 mt-1 uppercase tracking-tighter">범위 입력 감지: 수량이 자동 계산됩니다</p>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-black outline-none" />
+                                <div className="relative">
+                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className={`w-full px-4 py-3 text-lg border-2 rounded-xl font-black outline-none ${serialNumber.includes('~') ? 'bg-indigo-50 border-indigo-200' : 'border-slate-100'}`} />
+                                  {serialNumber.includes('~') && <SyncIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 animate-pulse" />}
+                                </div>
                                 <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="고객명" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none" />
                             </div>
                             <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none" />

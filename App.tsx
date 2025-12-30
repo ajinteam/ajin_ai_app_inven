@@ -49,7 +49,6 @@ const App: React.FC = () => {
         setDataSource('cloud');
         setSyncStatus('success');
         setLastSyncedAt(new Date());
-        // Cache locally as backup
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.items));
         return true;
       }
@@ -88,7 +87,6 @@ const App: React.FC = () => {
     } catch (err) {
       console.error('Cloud Save Error:', err);
       setSyncStatus('error');
-      // Always save to local regardless
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
   };
@@ -103,15 +101,10 @@ const App: React.FC = () => {
   // Auto-Save Effect (Debounced)
   useEffect(() => {
     if (isInitialLoad.current) return;
-
-    // Immediate local save for safety
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-
-    // Debounced cloud save
     const timer = setTimeout(() => {
       saveToCloud(items);
     }, 1500);
-
     return () => clearTimeout(timer);
   }, [items]);
 
@@ -131,6 +124,41 @@ const App: React.FC = () => {
     });
     return Array.from(new Set(serials));
   }, [items]);
+
+  // Local Import / Export Logic
+  const handleLocalExport = () => {
+    const dataObj = { items, exportDate: new Date().toISOString(), version: '2.0' };
+    const blob = new Blob([JSON.stringify(dataObj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `INVENTORY_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLocalImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (json.items && Array.isArray(json.items)) {
+          if (confirm('백업 파일을 불러오시겠습니까? 현재 클라우드와 로컬 데이터가 이 파일로 덮어씌워집니다.')) {
+            setItems(json.items);
+            alert('데이터 복구 완료. 클라우드 동기화가 진행됩니다.');
+          }
+        } else {
+          alert('올바른 백업 파일 형식이 아닙니다.');
+        }
+      } catch (err) {
+        alert('파일을 읽는 중 오류가 발생했습니다.');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,7 +269,7 @@ const App: React.FC = () => {
               <BoxIcon className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase text-center">재고 관리 시스템</h1>
-            <p className="text-[10px] text-slate-400 font-black mt-2 tracking-widest uppercase">Vercel KV Backend Enabled</p>
+            <p className="text-[10px] text-slate-400 font-black mt-2 tracking-widest uppercase">Vercel KV Cloud Infrastructure</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
             <input 
@@ -269,7 +297,7 @@ const App: React.FC = () => {
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${dataSource === 'cloud' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
                           {dataSource === 'cloud' ? <ServerIcon className="w-2.5 h-2.5" /> : <BoxIcon className="w-2.5 h-2.5" />}
-                          {dataSource === 'cloud' ? 'Cloud Connected' : 'Local Standalone'}
+                          {dataSource === 'cloud' ? 'Cloud Connected' : 'Local Backup Mode'}
                         </span>
                         {syncStatus === 'loading' && <SyncIcon className="w-3 h-3 text-indigo-400 animate-spin" />}
                         {syncStatus === 'error' && <span className="text-[9px] text-rose-500 font-black uppercase">Sync Failed</span>}
@@ -280,9 +308,18 @@ const App: React.FC = () => {
                 
                 <div className="flex flex-col items-end space-y-2">
                   <div className="flex items-center space-x-2">
+                    <button onClick={handleLocalExport} className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all text-[10px] font-black uppercase tracking-widest shadow-sm">
+                        <DownloadIcon className="w-3 h-3" />
+                        <span>백업 저장</span>
+                    </button>
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all text-[10px] font-black uppercase tracking-widest shadow-sm cursor-pointer">
+                        <CloudIcon className="w-3 h-3" />
+                        <span>백업 불러오기</span>
+                        <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLocalImport} />
+                    </label>
                     <button onClick={fetchFromCloud} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest border border-indigo-100">
                         <SyncIcon className={`w-3 h-3 ${syncStatus === 'loading' ? 'animate-spin' : ''}`} />
-                        <span>데이터 새로고침</span>
+                        <span>새로고침</span>
                     </button>
                     <button onClick={handleLogout} className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-colors font-black text-[10px] uppercase border border-slate-200">Logout</button>
                   </div>
@@ -329,7 +366,7 @@ const App: React.FC = () => {
             <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
               <div className="flex flex-col items-center">
                 <SyncIcon className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-                <p className="font-black text-slate-600 uppercase tracking-widest">서버에서 데이터 로드 중...</p>
+                <p className="font-black text-slate-600 uppercase tracking-widest">데이터 동기화 중...</p>
               </div>
             </div>
           )}
