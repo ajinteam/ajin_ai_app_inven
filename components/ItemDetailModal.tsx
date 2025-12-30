@@ -167,7 +167,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
   
   const handleActionConfirm = () => {
-    const requiredPass = authRole === 'admin' ? ADMIN_PASSWORD : PRODUCT_ONLY_PASSWORD;
+    const requiredPass = authRole === 'admin' ? '5200' : '3281'; // Re-using passwords from App context
     if (password !== requiredPass) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
@@ -269,7 +269,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
               ) : (
                 <>
-                  <h3 className="text-4xl font-black text-slate-800 mb-6 break-all leading-tight uppercase tracking-tight">{item.name}</h3>
+                  {/* Reduced font size from text-4xl to text-3xl */}
+                  <h3 className="text-3xl font-black text-slate-800 mb-6 break-all leading-tight uppercase tracking-tight">{item.name}</h3>
                   <div className="space-y-4 text-lg">
                     <div className="flex justify-between border-b-2 border-slate-100 pb-3"><span className="text-slate-400 font-black uppercase text-xs">Code</span><span className="font-mono font-black text-indigo-600">{item.code}</span></div>
                     {item.type === 'part' && (
@@ -460,7 +461,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                             ) : (
                                               <>
                                                 <button onClick={() => handleEditTransaction(t)} className="p-3 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><EditIcon className="w-6 h-6" /></button>
-                                                <button onClick={() => handleDeleteTrans(t.id)} className="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><TrashIcon className="w-6 h-6" /></button>
+                                                {/* Only Admin can delete transactions */}
+                                                {authRole === 'admin' && (
+                                                  <button onClick={() => handleDeleteTrans(t.id)} className="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><TrashIcon className="w-6 h-6" /></button>
+                                                )}
                                               </>
                                             )}
                                           </div>

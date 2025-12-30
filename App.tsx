@@ -181,7 +181,11 @@ const App: React.FC = () => {
         date: new Date().toISOString(), remarks: '초기 수량 등록',
       });
     }
-    setItems(prev => [newItem, ...prev]);
+    setItems(prev => {
+      const newItems = [...prev, newItem];
+      // Alphanumeric sorting by code
+      return newItems.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+    });
   };
 
   const handleDeleteItemConfirm = () => {
@@ -390,7 +394,8 @@ const App: React.FC = () => {
                     return (
                       <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
                         <td className="px-10 py-7 font-mono text-indigo-600 font-black text-xl">{item.code}</td>
-                        <td className="px-10 py-7 font-black text-slate-800 text-xl">{item.name}</td>
+                        {/* Changed text-xl to text-lg below */}
+                        <td className="px-10 py-7 font-black text-slate-800 text-lg">{item.name}</td>
                         {activeTab === 'part' && <td className="px-10 py-7 text-slate-400 font-mono text-sm uppercase font-bold">{item.drawingNumber || '-'}</td>}
                         <td className="px-10 py-7 text-right">
                             <span className={`text-4xl font-black ${stock > 0 ? 'text-slate-900' : 'text-rose-500 animate-pulse'}`}>
@@ -400,7 +405,10 @@ const App: React.FC = () => {
                         <td className="px-10 py-7">
                           <div className="flex justify-center gap-4">
                             <button onClick={() => setSelectedItemId(item.id)} className="px-6 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-black text-sm uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all shadow-sm">상세내역</button>
-                            <button onClick={() => setItemToDelete({id: item.id, type: 'inventory'})} className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><TrashIcon className="w-7 h-7" /></button>
+                            {/* Restricted to Admin only */}
+                            {authRole === 'admin' && (
+                              <button onClick={() => setItemToDelete({id: item.id, type: 'inventory'})} className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><TrashIcon className="w-7 h-7" /></button>
+                            )}
                           </div>
                         </td>
                       </tr>
