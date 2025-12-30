@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Item, Transaction } from '../types';
-import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, TrashIcon, DownloadIcon, PlusIcon, SyncIcon } from './icons';
+import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, TrashIcon, DownloadIcon, PlusIcon, SyncIcon, SearchIcon } from './icons';
 
 interface ItemDetailModalProps {
   item: Item;
@@ -73,6 +73,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [showPasswordInput, setShowPasswordInput] = useState<{ type: 'item' | 'trans_save' | 'trans_delete'; targetId?: string; } | null>(null);
   const [password, setPassword] = useState('');
   const [editFormData, setEditFormData] = useState<Partial<Item>>({});
+  
+  // History Search State
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   useEffect(() => {
     if (item.type === 'product' && !serialNumber) setSerialNumber(suggestNextSerial(allUsedSerials));
@@ -94,7 +97,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           setQuantity(range.length.toString());
         }
       } catch (e) {
-        // Range too large or invalid, ignore for auto-quantity
+        // Silent catch for invalid ranges
       }
     }
   }, [serialNumber, item.type]);
@@ -102,6 +105,17 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const currentStock = useMemo(() => item.transactions.reduce((acc, t) => t.type === 'purchase' ? acc + t.quantity : acc - t.quantity, 0), [item.transactions]);
   const isSerialDuplicate = useMemo(() => (!serialNumber.trim() || serialNumber.includes('~')) ? false : allUsedSerials.includes(serialNumber.toUpperCase()), [serialNumber, allUsedSerials]);
   const isCodeDuplicate = useMemo(() => (!editFormData.code || editFormData.code === item.code) ? false : existingCodes.some(c => c.toUpperCase() === editFormData.code?.toUpperCase()), [editFormData.code, existingCodes, item.code]);
+
+  // Filtered History
+  const filteredHistory = useMemo(() => {
+    const term = historySearchTerm.toLowerCase().trim();
+    if (!term) return [...item.transactions].reverse();
+    return [...item.transactions].reverse().filter(t => 
+      t.serialNumber?.toLowerCase().includes(term) || 
+      t.customerName?.toLowerCase().includes(term) ||
+      t.remarks?.toLowerCase().includes(term)
+    );
+  }, [item.transactions, historySearchTerm]);
 
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,10 +139,21 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (transactionType === 'release' && count > currentStock) { alert('재고 부족!'); return; }
     
     if (isRange) {
-      targetSerials.forEach(s => onAddTransaction(item.id, { type: transactionType, quantity: 1, date: new Date().toISOString(), remarks: transRemarks, modelName: transModelName, userId: transUserId, serialNumber: s, customerName, address, phoneNumber }));
-      alert(`${targetSerials.length}건이 일련번호 기반으로 자동 등록되었습니다.`);
+      targetSerials.forEach(s => onAddTransaction(item.id, { 
+        type: transactionType, quantity: 1, date: new Date().toISOString(), 
+        remarks: transRemarks, modelName: transModelName, userId: transUserId, 
+        serialNumber: s, customerName, address, phoneNumber 
+      }));
+      alert(`${targetSerials.length}건이 일련번호 기반으로 개별 등록되었습니다.`);
     } else {
-      onAddTransaction(item.id, { type: transactionType, quantity: count, date: new Date().toISOString(), remarks: transRemarks, modelName: transModelName, userId: transUserId, serialNumber: item.type === 'product' ? serialNumber.toUpperCase() : '', customerName: item.type === 'product' ? customerName : '', address: item.type === 'product' ? address : '', phoneNumber: item.type === 'product' ? phoneNumber : '' });
+      onAddTransaction(item.id, { 
+        type: transactionType, quantity: count, date: new Date().toISOString(), 
+        remarks: transRemarks, modelName: transModelName, userId: transUserId, 
+        serialNumber: item.type === 'product' ? serialNumber.toUpperCase() : '', 
+        customerName: item.type === 'product' ? customerName : '', 
+        address: item.type === 'product' ? address : '', 
+        phoneNumber: item.type === 'product' ? phoneNumber : '' 
+      });
     }
     
     setQuantity(''); 
@@ -182,7 +207,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     let csvContent = "\ufeff";
     const headers = item.type === 'part' ? ['날짜', '시간', '구분', '수량', '기종', '비고'] : ['날짜', '시간', '구분', '수량', '아이디', '일련번호', '고객명', '연락처', '주소', '비고'];
     csvContent += headers.join(',') + '\r\n';
-    [...item.transactions].reverse().forEach(t => {
+    filteredHistory.forEach(t => {
       const d = new Date(t.date);
       const row = [d.toLocaleDateString(), d.toLocaleTimeString(), t.type === 'purchase' ? '입고' : '출고', t.quantity];
       if (item.type === 'part') row.push(t.modelName || '', t.remarks || '');
@@ -276,59 +301,174 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                           <>
                             <div className="relative">
                                 <div className="flex justify-between items-center mb-2">
-                                  <label className="text-xs font-black uppercase text-slate-400 tracking-widest">일련번호 (범위입력: ~ )</label>
+                                  <label className="text-xs font-black uppercase text-slate-400 tracking-widest">일련번호 (범위: CT0001~0010)</label>
                                   <button type="button" onClick={() => setSerialNumber(suggestNextSerial(allUsedSerials))} className="text-[10px] font-black text-indigo-600 underline">다음번호 제안</button>
                                 </div>
                                 <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="예: AJP00001~00005" className={`w-full px-4 py-3 text-lg border-2 rounded-xl font-black outline-none focus:ring-4 ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
                                 {serialNumber.includes('~') && (
-                                  <p className="text-[10px] font-black text-indigo-500 mt-1 uppercase tracking-tighter">범위 입력 감지: 수량이 자동 계산됩니다</p>
+                                  <div className="flex items-center gap-1.5 mt-2 px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-lg animate-pulse">
+                                    <SyncIcon className="w-2.5 h-2.5 text-indigo-500" />
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter">자동 범위 등록 모드 활성화</p>
+                                  </div>
                                 )}
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="relative">
-                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className={`w-full px-4 py-3 text-lg border-2 rounded-xl font-black outline-none ${serialNumber.includes('~') ? 'bg-indigo-50 border-indigo-200' : 'border-slate-100'}`} />
-                                  {serialNumber.includes('~') && <SyncIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 animate-pulse" />}
+                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required disabled={serialNumber.includes('~')} className={`w-full px-4 py-3 text-lg border-2 rounded-xl font-black outline-none ${serialNumber.includes('~') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'border-slate-100 focus:border-indigo-400'}`} />
+                                  {serialNumber.includes('~') && <p className="absolute -bottom-4 left-0 text-[8px] font-bold text-slate-400 uppercase">범위에 의해 자동 설정됨</p>}
                                 </div>
-                                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="고객명" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none" />
+                                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                             </div>
-                            <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none" />
-                            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="배송 주소" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none" />
+                            <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="배송 주소" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                           </>
                         ) : (
                           <div className="grid grid-cols-2 gap-4">
-                            <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-black outline-none" />
-                            <input type="text" value={transModelName} onChange={(e) => setTransModelName(e.target.value)} placeholder="기종" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none" />
+                            <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
+                            <input type="text" value={transModelName} onChange={(e) => setTransModelName(e.target.value)} placeholder="기종" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                           </div>
                         )}
-                        <input type="text" value={transRemarks} onChange={(e) => setTransRemarks(e.target.value)} placeholder="사유 / 비고" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none" />
+                        <input type="text" value={transRemarks} onChange={(e) => setTransRemarks(e.target.value)} placeholder="사유 / 비고" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                       </div>
-                      <button type="submit" className={`w-full py-5 text-white text-lg font-black rounded-2xl shadow-xl transition-all active:scale-95 ${transactionType === 'purchase' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-rose-600 hover:bg-rose-700'} uppercase tracking-widest`}>데이터 저장</button>
+                      <button type="submit" className={`w-full py-5 text-white text-lg font-black rounded-2xl shadow-xl transition-all active:scale-95 ${transactionType === 'purchase' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-rose-600 hover:bg-rose-700'} uppercase tracking-widest`}>
+                        데이터 {serialNumber.includes('~') ? '일괄' : '' } 저장
+                      </button>
                   </form>
               </div>
             )}
           </div>
           <div className="lg:col-span-3 flex flex-col">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">전체 수불 히스토리</h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div className="flex items-center gap-6">
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">수불 히스토리</h3>
+                <div className="relative w-64">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3"><SearchIcon className="text-slate-400 w-4 h-4" /></span>
+                    <input
+                        type="text" value={historySearchTerm} onChange={(e) => setHistorySearchTerm(e.target.value)}
+                        placeholder="일련번호, 대상자 검색..."
+                        className="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-indigo-300 bg-white text-sm font-bold"
+                    />
+                </div>
+              </div>
               <button onClick={exportHistoryToExcel} className="flex items-center gap-2 px-5 py-3 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-2xl text-sm font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-md">
-                <DownloadIcon className="w-5 h-5" /><span>히스토리 내보내기</span></button>
+                <DownloadIcon className="w-5 h-5" /><span>목록 내보내기</span></button>
             </div>
             <div className="flex-grow border-2 border-slate-100 rounded-[2rem] overflow-hidden bg-slate-50/50">
                 <div className="h-full max-h-[calc(90vh-220px)] overflow-y-auto">
-                    {item.transactions.length === 0 ? (<div className="flex flex-col items-center justify-center h-full p-20 opacity-20"><BoxIcon className="w-24 h-24 mb-4" /><p className="text-xl font-black uppercase tracking-widest">기록된 내역이 없습니다</p></div>) : (
+                    {filteredHistory.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full p-20 opacity-20">
+                        <BoxIcon className="w-24 h-24 mb-4" />
+                        <p className="text-xl font-black uppercase tracking-widest">
+                          {historySearchTerm ? '검색 결과가 없습니다' : '기록된 내역이 없습니다'}
+                        </p>
+                      </div>
+                    ) : (
                         <div className="overflow-x-auto"><table className="w-full text-left text-base">
-                            <thead className="bg-white border-b-2 border-slate-100 text-sm font-black uppercase text-slate-400 sticky top-0 z-10"><tr><th className="px-6 py-5">날짜 / 구분</th><th className="px-6 py-5">수량</th>{item.type === 'part' && <th className="px-6 py-5">기종</th>}{item.type === 'product' && (<><th className="px-6 py-5">일련번호</th><th className="px-6 py-5">대상자</th><th className="px-6 py-5">주소</th></>)}<th className="px-6 py-5">비고</th><th className="px-6 py-5 text-center">작업</th></tr></thead>
+                            <thead className="bg-white border-b-2 border-slate-100 text-sm font-black uppercase text-slate-400 sticky top-0 z-10">
+                              <tr>
+                                <th className="px-6 py-5">날짜 / 구분</th>
+                                <th className="px-6 py-5">수량</th>
+                                {item.type === 'part' && <th className="px-6 py-5">기종</th>}
+                                {item.type === 'product' && (
+                                  <>
+                                    <th className="px-6 py-5">일련번호</th>
+                                    <th className="px-6 py-5">대상자</th>
+                                    <th className="px-6 py-5">주소</th>
+                                  </>
+                                )}
+                                <th className="px-6 py-5">비고</th>
+                                <th className="px-6 py-5 text-center">작업</th>
+                              </tr>
+                            </thead>
                             <tbody className="divide-y-2 divide-white">
-                                {[...item.transactions].reverse().map(t => (
-                                    <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''}`}><td className="px-6 py-6"><div className="flex items-center gap-4"><div className={`p-2 rounded-xl ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>{t.type === 'purchase' ? <ArrowUpIcon className="w-5 h-5"/> : <ArrowDownIcon className="w-5 h-5"/>}</div><div><p className="font-black text-slate-700 text-lg">{new Date(t.date).toLocaleDateString()}</p><p className="text-xs text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString()}</p></div></div></td>
-                                        <td className="px-6 py-6">{editingTransactionId === t.id ? (<input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-24 px-3 py-2 border-2 rounded-xl bg-white font-black text-lg" />) : (<span className={`font-black text-2xl ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'}`}>{t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}</span>)}</td>
-                                        {item.type === 'part' && (<td className="px-6 py-6">{editingTransactionId === t.id ? (<input name="modelName" value={transEditData.modelName || ''} onChange={handleTransEditChange} className="w-32 px-3 py-2 border-2 rounded-xl bg-white" />) : (<span className="font-black text-slate-600">{t.modelName || '-'}</span>)}</td>)}
-                                        {item.type === 'product' && (<><td className="px-6 py-6">{editingTransactionId === t.id ? (<input name="serialNumber" value={transEditData.serialNumber || ''} onChange={handleTransEditChange} className="w-32 px-3 py-2 border-2 rounded-xl bg-white font-black uppercase" />) : (<span className="font-mono font-black text-indigo-600 text-lg">{t.serialNumber || '-'}</span>)}</td><td className="px-6 py-6">{editingTransactionId === t.id ? (<div className="space-y-2"><input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-3 py-2 border-2 rounded-xl bg-white" /><input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-3 py-2 border-2 rounded-xl bg-white" /></div>) : (<><p className="font-black text-slate-800 text-lg">{t.customerName || '-'}</p><p className="text-slate-400 font-bold text-sm">{t.phoneNumber || '-'}</p></>)}</td><td className="px-6 py-6">{editingTransactionId === t.id ? (<input name="address" value={transEditData.address || ''} onChange={handleTransEditChange} placeholder="주소" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />) : (<p className="text-slate-500 font-bold truncate max-w-[200px]" title={t.address}>{t.address || '-'}</p>)}</td></>)}
-                                        <td className="px-6 py-6">{editingTransactionId === t.id ? (<input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />) : (<p className="text-sm text-slate-400 font-black truncate max-w-[250px]">{t.remarks || '-'}</p>)}</td>
-                                        <td className="px-6 py-6 text-center"><div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {editingTransactionId === t.id ? (<><button onClick={() => handleSaveTransEdit(t.id)} className="p-3 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"><CheckIcon className="w-6 h-6" /></button><button onClick={() => setEditingTransactionId(null)} className="p-3 text-slate-400 hover:bg-slate-50 rounded-xl transition-all"><CloseIcon className="w-6 h-6" /></button></>) : (<><button onClick={() => handleEditTransaction(t)} className="p-3 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><EditIcon className="w-6 h-6" /></button><button onClick={() => handleDeleteTrans(t.id)} className="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><TrashIcon className="w-6 h-6" /></button></>)}
-                                          </div></td></tr>
-                                ))}</tbody></table></div>
+                                {filteredHistory.map(t => (
+                                    <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''}`}>
+                                        <td className="px-6 py-6">
+                                          <div className="flex items-center gap-4">
+                                            <div className={`p-2 rounded-xl ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                              {t.type === 'purchase' ? <ArrowUpIcon className="w-5 h-5"/> : <ArrowDownIcon className="w-5 h-5"/>}
+                                            </div>
+                                            <div>
+                                              <p className="font-black text-slate-700 text-lg">{new Date(t.date).toLocaleDateString()}</p>
+                                              <p className="text-xs text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString()}</p>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="px-6 py-6">
+                                          {editingTransactionId === t.id ? (
+                                            <input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-24 px-3 py-2 border-2 rounded-xl bg-white font-black text-lg" />
+                                          ) : (
+                                            <span className={`font-black text-2xl ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                              {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
+                                            </span>
+                                          )}
+                                        </td>
+                                        {item.type === 'part' && (
+                                          <td className="px-6 py-6">
+                                            {editingTransactionId === t.id ? (
+                                              <input name="modelName" value={transEditData.modelName || ''} onChange={handleTransEditChange} className="w-32 px-3 py-2 border-2 rounded-xl bg-white" />
+                                            ) : (
+                                              <span className="font-black text-slate-600">{t.modelName || '-'}</span>
+                                            )}
+                                          </td>
+                                        )}
+                                        {item.type === 'product' && (
+                                          <>
+                                            <td className="px-6 py-6">
+                                              {editingTransactionId === t.id ? (
+                                                <input name="serialNumber" value={transEditData.serialNumber || ''} onChange={handleTransEditChange} className="w-32 px-3 py-2 border-2 rounded-xl bg-white font-black uppercase" />
+                                              ) : (
+                                                <span className="font-mono font-black text-indigo-600 text-lg">{t.serialNumber || '-'}</span>
+                                              )}
+                                            </td>
+                                            <td className="px-6 py-6">
+                                              {editingTransactionId === t.id ? (
+                                                <div className="space-y-2">
+                                                  <input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
+                                                  <input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
+                                                </div>
+                                              ) : (
+                                                <>
+                                                  <p className="font-black text-slate-800 text-lg">{t.customerName || '-'}</p>
+                                                  <p className="text-slate-400 font-bold text-sm">{t.phoneNumber || '-'}</p>
+                                                </>
+                                              )}
+                                            </td>
+                                            <td className="px-6 py-6">
+                                              {editingTransactionId === t.id ? (
+                                                <input name="address" value={transEditData.address || ''} onChange={handleTransEditChange} placeholder="주소" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
+                                              ) : (
+                                                <p className="text-slate-500 font-bold truncate max-w-[200px]" title={t.address}>{t.address || '-'}</p>
+                                              )}
+                                            </td>
+                                          </>
+                                        )}
+                                        <td className="px-6 py-6">
+                                          {editingTransactionId === t.id ? (
+                                            <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
+                                          ) : (
+                                            <p className="text-sm text-slate-400 font-black truncate max-w-[250px]">{t.remarks || '-'}</p>
+                                          )}
+                                        </td>
+                                        <td className="px-6 py-6 text-center">
+                                          <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {editingTransactionId === t.id ? (
+                                              <>
+                                                <button onClick={() => handleSaveTransEdit(t.id)} className="p-3 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"><CheckIcon className="w-6 h-6" /></button>
+                                                <button onClick={() => setEditingTransactionId(null)} className="p-3 text-slate-400 hover:bg-slate-50 rounded-xl transition-all"><CloseIcon className="w-6 h-6" /></button>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <button onClick={() => handleEditTransaction(t)} className="p-3 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><EditIcon className="w-6 h-6" /></button>
+                                                <button onClick={() => handleDeleteTrans(t.id)} className="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><TrashIcon className="w-6 h-6" /></button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table></div>
                     )}
                 </div>
             </div>
