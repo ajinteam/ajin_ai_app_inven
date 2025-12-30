@@ -346,7 +346,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3"><SearchIcon className="text-slate-400 w-4 h-4" /></span>
                     <input
                         type="text" value={historySearchTerm} onChange={(e) => setHistorySearchTerm(e.target.value)}
-                        placeholder="일련번호, 대상자 검색..."
+                        placeholder="일련번호, 구매자, 비고 검색..."
                         className="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-indigo-300 bg-white text-sm font-bold"
                     />
                 </div>
