@@ -29,72 +29,73 @@ const App: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'inventory'} | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
 
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline'>('idle');
+  // Sync States
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline'>('loading');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [dataSource, setDataSource] = useState<'cloud' | 'local'>('local');
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const isInitialLoad = useRef(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Database Fetch Logic
-  const fetchFromDB = async () => {
+  // Cloud DB Fetch
+  const fetchFromCloud = async () => {
     setSyncStatus('loading');
     try {
       const response = await fetch('/api/inventory');
-      if (response.ok) {
-        const data = await response.json();
-        if (data && Array.isArray(data.items)) {
-          setItems(data.items);
-          setSyncStatus('success');
-          setLastSyncedAt(new Date());
-          setDataSource('cloud');
-          // Update local cache as backup
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.items));
-          return true;
-        }
+      if (!response.ok) throw new Error('Server unreachable');
+      
+      const data = await response.json();
+      if (data && Array.isArray(data.items)) {
+        setItems(data.items);
+        setDataSource('cloud');
+        setSyncStatus('success');
+        setLastSyncedAt(new Date());
+        // Cache locally as backup
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.items));
+        return true;
       }
-      throw new Error('API Response invalid');
     } catch (err) {
-      console.warn('Backend DB connection failed, falling back to LocalStorage:', err);
+      console.warn('Cloud fetch failed, using local cache:', err);
       const savedItems = localStorage.getItem(STORAGE_KEY);
       if (savedItems) {
         setItems(JSON.parse(savedItems));
-        setDataSource('local');
       }
+      setDataSource('local');
       setSyncStatus('offline');
       return false;
     }
   };
 
-  // Database Save Logic
-  const saveToDB = async (data: Item[]) => {
+  // Cloud DB Save
+  const saveToCloud = async (data: Item[]) => {
     setSyncStatus('loading');
     try {
       const response = await fetch('/api/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          items: data, 
-          updatedAt: new Date().toISOString(),
-          client: 'Web-Inventory-v2' 
-        }),
+        body: JSON.stringify({
+          items: data,
+          lastUpdated: new Date().toISOString()
+        })
       });
+
       if (response.ok) {
         setSyncStatus('success');
         setLastSyncedAt(new Date());
         setDataSource('cloud');
       } else {
-        throw new Error('Failed to save to cloud');
+        throw new Error('Save failed');
       }
     } catch (err) {
-      console.error('Cloud Sync Failed:', err);
+      console.error('Cloud Save Error:', err);
       setSyncStatus('error');
-      setDataSource('local');
+      // Always save to local regardless
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
   };
 
-  // Initial Sync on Component Mount
+  // Initial Data Load
   useEffect(() => {
-    fetchFromDB().then(() => {
+    fetchFromCloud().finally(() => {
       isInitialLoad.current = false;
     });
   }, []);
@@ -103,12 +104,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isInitialLoad.current) return;
 
-    // 1. Immediate save to LocalStorage for safety
+    // Immediate local save for safety
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 
-    // 2. Debounced save to Vercel DB
+    // Debounced cloud save
     const timer = setTimeout(() => {
-      saveToDB(items);
+      saveToCloud(items);
     }, 1500);
 
     return () => clearTimeout(timer);
@@ -130,41 +131,6 @@ const App: React.FC = () => {
     });
     return Array.from(new Set(serials));
   }, [items]);
-
-  const handleLocalExport = async () => {
-    const dataObj = { items, version: '2.0', exportDate: new Date().toISOString() };
-    const jsonStr = JSON.stringify(dataObj, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `재고관리_백업_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleLocalImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        if (json.items && Array.isArray(json.items)) {
-          if (confirm('데이터를 가져오시겠습니까? 현재 클라우드와 로컬 데이터가 이 파일로 덮어씌워집니다.')) {
-            setItems(json.items);
-            alert('데이터 로드 완료. 클라우드 동기화가 시작됩니다.');
-          }
-        } else {
-          alert('올바른 파일 형식이 아닙니다.');
-        }
-      } catch (err) {
-        alert('파일을 읽는 중 오류가 발생했습니다.');
-      }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -275,7 +241,7 @@ const App: React.FC = () => {
               <BoxIcon className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase text-center">재고 관리 시스템</h1>
-            <p className="text-[10px] text-slate-400 font-black mt-2 tracking-widest uppercase">Cloud Connected V2.0</p>
+            <p className="text-[10px] text-slate-400 font-black mt-2 tracking-widest uppercase">Vercel KV Backend Enabled</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
             <input 
@@ -303,40 +269,22 @@ const App: React.FC = () => {
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${dataSource === 'cloud' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
                           {dataSource === 'cloud' ? <ServerIcon className="w-2.5 h-2.5" /> : <BoxIcon className="w-2.5 h-2.5" />}
-                          {dataSource === 'cloud' ? 'Cloud Server' : 'Local Backup'}
+                          {dataSource === 'cloud' ? 'Cloud Connected' : 'Local Standalone'}
                         </span>
-                        {lastSyncedAt && (
-                          <span className="text-[9px] text-slate-400 font-bold">
-                            최근 동기화: {lastSyncedAt.toLocaleTimeString()}
-                          </span>
-                        )}
+                        {syncStatus === 'loading' && <SyncIcon className="w-3 h-3 text-indigo-400 animate-spin" />}
+                        {syncStatus === 'error' && <span className="text-[9px] text-rose-500 font-black uppercase">Sync Failed</span>}
+                        {lastSyncedAt && <span className="text-[9px] text-slate-400 font-bold ml-1">{lastSyncedAt.toLocaleTimeString()}</span>}
                       </div>
                     </div>
                 </div>
                 
                 <div className="flex flex-col items-end space-y-2">
                   <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={() => fetchFromDB()} 
-                      disabled={syncStatus === 'loading'}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border transition-all text-[9px] font-black uppercase tracking-widest ${syncStatus === 'loading' ? 'bg-slate-50 text-slate-400 border-slate-100 animate-pulse' : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'}`}
-                    >
-                      <SyncIcon className={`w-3 h-3 ${syncStatus === 'loading' ? 'animate-spin' : ''}`} />
-                      <span>{syncStatus === 'loading' ? 'Syncing...' : 'DB Refresh'}</span>
+                    <button onClick={fetchFromCloud} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest border border-indigo-100">
+                        <SyncIcon className={`w-3 h-3 ${syncStatus === 'loading' ? 'animate-spin' : ''}`} />
+                        <span>데이터 새로고침</span>
                     </button>
-                    <button onClick={handleLogout} className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-md hover:bg-rose-50 hover:text-rose-600 transition-colors font-black text-[9px] uppercase border border-slate-200">Logout</button>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <button onClick={handleLocalExport} className="flex items-center gap-1.5 px-2.5 py-1 bg-white text-slate-500 border border-slate-200 rounded-md hover:bg-slate-50 transition-all text-[9px] font-black uppercase tracking-wider shadow-sm">
-                        <DownloadIcon className="w-2.5 h-2.5" />
-                        <span>백업 저장</span>
-                    </button>
-                    <label className="flex items-center gap-1.5 px-2.5 py-1 bg-white text-slate-500 border border-slate-200 rounded-md hover:bg-slate-50 transition-all text-[9px] font-black cursor-pointer uppercase tracking-wider shadow-sm">
-                        <CloudIcon className="w-2.5 h-2.5" />
-                        <span>백업 로드</span>
-                        <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLocalImport} />
-                    </label>
+                    <button onClick={handleLogout} className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-colors font-black text-[10px] uppercase border border-slate-200">Logout</button>
                   </div>
                 </div>
             </div>
@@ -355,16 +303,6 @@ const App: React.FC = () => {
       </header>
 
       <main className="container mx-auto p-4 sm:p-8">
-        {syncStatus === 'error' && (
-          <div className="mb-6 p-4 bg-rose-50 border-2 border-rose-100 rounded-2xl flex items-center justify-between animate-pulse">
-            <div className="flex items-center gap-3 text-rose-600">
-              <SyncIcon className="w-5 h-5" />
-              <span className="font-black uppercase text-xs tracking-widest">서버 연결 오류 - 현재 데이터가 클라우드에 저장되지 않고 있습니다</span>
-            </div>
-            <button onClick={() => fetchFromDB()} className="px-4 py-1.5 bg-rose-600 text-white text-[10px] font-black rounded-lg uppercase">재시도</button>
-          </div>
-        )}
-
         <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-6 mb-10">
           <div className="relative flex-grow max-w-3xl">
               <span className="absolute inset-y-0 left-0 flex items-center pl-5"><SearchIcon className="text-slate-400 w-6 h-6" /></span>
@@ -386,7 +324,15 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white shadow-2xl border border-slate-100 rounded-[2.5rem] overflow-hidden">
+        <div className="bg-white shadow-2xl border border-slate-100 rounded-[2.5rem] overflow-hidden relative">
+          {syncStatus === 'loading' && isInitialLoad.current && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
+              <div className="flex flex-col items-center">
+                <SyncIcon className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+                <p className="font-black text-slate-600 uppercase tracking-widest">서버에서 데이터 로드 중...</p>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="text-sm text-slate-400 uppercase bg-slate-50/50 border-b border-slate-100 font-black tracking-[0.2em]">
@@ -440,8 +386,8 @@ const App: React.FC = () => {
                 </div>
                 <input type="password" autoFocus value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleDeleteItemConfirm()} placeholder="PASSWORD" className="w-full px-6 py-5 border-2 border-slate-100 rounded-2xl focus:border-rose-500 outline-none mb-8 text-center text-3xl font-black tracking-widest" />
                 <div className="grid grid-cols-2 gap-4">
-                    <button onClick={() => setItemToDelete(null)} className="py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-xs tracking-widest">취소</button>
-                    <button onClick={handleDeleteItemConfirm} className="py-4 bg-rose-600 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-rose-100">삭제 확정</button>
+                    <button onClick={() => setItemToDelete(null)} className="py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm tracking-widest">취소</button>
+                    <button onClick={handleDeleteItemConfirm} className="py-4 bg-rose-600 text-white rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-rose-100">삭제 확정</button>
                 </div>
             </div>
         </div>
