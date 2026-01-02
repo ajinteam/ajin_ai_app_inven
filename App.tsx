@@ -164,6 +164,7 @@ const App: React.FC = () => {
     e.preventDefault();
     if (loginPassword === ADMIN_PASSWORD) setAuthRole('admin');
     else if (loginPassword === PRODUCT_ONLY_PASSWORD) setAuthRole('product_only');
+    setActiveTab('product');
     else alert('비밀번호가 틀렸습니다.');
     setLoginPassword('');
   };
