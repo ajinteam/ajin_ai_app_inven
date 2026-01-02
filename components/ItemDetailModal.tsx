@@ -15,14 +15,14 @@ interface ItemDetailModalProps {
   onClose: () => void;
 }
 
-const ADMIN_PASSWORD = '0000';
-const PRODUCT_ONLY_PASSWORD = '1111';
+const ADMIN_PASSWORD = '5200';
+const PRODUCT_ONLY_PASSWORD = '2611';
 
 const suggestNextSerial = (usedSerials: string[]): string => {
-  if (usedSerials.length === 0) return 'SN00001';
+  if (usedSerials.length === 0) return 'AJP00001';
   const regex = /^([a-zA-Z]+)(\d+)$/;
   let maxNum = 0;
-  let currentPrefix = 'SN';
+  let currentPrefix = 'AJP';
   usedSerials.forEach(s => {
     const match = s.toUpperCase().match(regex);
     if (match) {
@@ -167,7 +167,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
   
   const handleActionConfirm = () => {
-    const requiredPass = authRole === 'admin' ? '5200' : '3281'; // Re-using passwords from App context
+    const requiredPass = authRole === 'admin' ? '5200' : '2611'; // Re-using passwords from App context
     if (password !== requiredPass) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
