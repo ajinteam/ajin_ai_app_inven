@@ -161,13 +161,20 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loginPassword === ADMIN_PASSWORD) setAuthRole('admin');
-    else if (loginPassword === PRODUCT_ONLY_PASSWORD) setAuthRole('product_only');
-    setActiveTab('product');
-    else alert('비밀번호가 틀렸습니다.');
-    setLoginPassword('');
-  };
+  e.preventDefault();
+  
+  if (loginPassword === ADMIN_PASSWORD) {
+    setAuthRole('admin');
+    setActiveTab('part'); // 관리자는 부품 재고부터 시작
+  } else if (loginPassword === PRODUCT_ONLY_PASSWORD) {
+    setAuthRole('product_only');
+    setActiveTab('product'); // 2611 사용자는 제품 재고로 강제 이동
+  } else {
+    alert('비밀번호가 틀렸습니다.');
+  }
+  
+  setLoginPassword('');
+};
 
   const handleLogout = () => {
     setAuthRole(null);
