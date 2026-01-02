@@ -7,7 +7,7 @@ import { PlusIcon, BoxIcon, SearchIcon, TrashIcon, DownloadIcon, CloudIcon, Serv
 
 const STORAGE_KEY = 'inventory_system_data_v2';
 const ADMIN_PASSWORD = '5200';
-const PRODUCT_ONLY_PASSWORD = '3281';
+const PRODUCT_ONLY_PASSWORD = '2611';
 
 const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
