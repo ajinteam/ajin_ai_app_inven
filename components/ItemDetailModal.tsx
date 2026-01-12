@@ -44,6 +44,7 @@ const parseSerialRange = (input: string): string[] => {
   const endNumStr = rangeMatch[4];
   const startNum = parseInt(startNumStr, 10);
   const endNum = parseInt(endNumStr, 10);
+  // Fix: Corrected typo 'iZNaN' to 'isNaN'
   if (isNaN(startNum) || isNaN(endNum) || startNum > endNum) return [input.trim()];
   if (endNum - startNum >= 100) throw new Error('범위는 최대 100개까지 가능합니다.');
   const results: string[] = [];
@@ -113,7 +114,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     return [...item.transactions].reverse().filter(t => 
       t.serialNumber?.toLowerCase().includes(term) || 
       t.customerName?.toLowerCase().includes(term) ||
-      t.remarks?.toLowerCase().includes(term)
+      t.remarks?.toLowerCase().includes(term) ||
+      t.userId?.toLowerCase().includes(term)
     );
   }, [item.transactions, historySearchTerm]);
 
@@ -269,7 +271,6 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
               ) : (
                 <>
-                  {/* Reduced font size from text-4xl to text-3xl */}
                   <h3 className="text-3xl font-black text-slate-800 mb-6 break-all leading-tight uppercase tracking-tight">{item.name}</h3>
                   <div className="space-y-4 text-lg">
                     <div className="flex justify-between border-b-2 border-slate-100 pb-3"><span className="text-slate-400 font-black uppercase text-xs">Code</span><span className="font-mono font-black text-indigo-600">{item.code}</span></div>
@@ -320,6 +321,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                 </div>
                                 <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                             </div>
+                            <input type="text" value={transUserId} onChange={(e) => setTransUserId(e.target.value)} placeholder="아이디" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                             <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                             <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="배송 주소" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                           </>
@@ -346,7 +348,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3"><SearchIcon className="text-slate-400 w-4 h-4" /></span>
                     <input
                         type="text" value={historySearchTerm} onChange={(e) => setHistorySearchTerm(e.target.value)}
-                        placeholder="일련번호, 구매자, 비고 검색..."
+                        placeholder="일련번호, 대상자, 아이디 검색..."
                         className="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-indigo-300 bg-white text-sm font-bold"
                     />
                 </div>
@@ -373,7 +375,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                 {item.type === 'product' && (
                                   <>
                                     <th className="px-6 py-5">일련번호</th>
-                                    <th className="px-6 py-5">대상자</th>
+                                    <th className="px-6 py-5">대상자/ID</th>
                                     <th className="px-6 py-5">주소</th>
                                   </>
                                 )}
@@ -426,11 +428,15 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                               {editingTransactionId === t.id ? (
                                                 <div className="space-y-2">
                                                   <input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
+                                                  <input name="userId" value={transEditData.userId || ''} onChange={handleTransEditChange} placeholder="ID" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
                                                   <input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
                                                 </div>
                                               ) : (
                                                 <>
-                                                  <p className="font-black text-slate-800 text-lg">{t.customerName || '-'}</p>
+                                                  <div className="flex items-center gap-2">
+                                                    <p className="font-black text-slate-800 text-lg">{t.customerName || '-'}</p>
+                                                    {t.userId && <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-1.5 py-0.5 rounded uppercase">{t.userId}</span>}
+                                                  </div>
                                                   <p className="text-slate-400 font-bold text-sm">{t.phoneNumber || '-'}</p>
                                                 </>
                                               )}
