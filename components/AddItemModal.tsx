@@ -80,72 +80,69 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 font-sans">
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl animate-fade-in-up overflow-hidden">
-        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">신규 {itemType === 'part' ? '부품' : '제품'} 등록</h2>
-          <button onClick={onClose} className="p-3 text-slate-400 hover:text-slate-800 transition-colors">
-            <CloseIcon className="w-8 h-8" />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 font-sans">
+      <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-2xl w-full max-w-xl animate-fade-in-up overflow-hidden max-h-[98vh] flex flex-col">
+        <div className="p-4 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase">신규 등록</h2>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 transition-colors">
+            <CloseIcon className="w-6 h-6 sm:w-8 sm:h-8" />
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="p-8 space-y-6 max-h-[75vh] overflow-y-auto">
-            <div className="flex p-1.5 bg-slate-100 rounded-2xl mb-4">
-                <button type="button" onClick={() => setItemType('part')} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${itemType === 'part' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>부품</button>
-                <button type="button" onClick={() => setItemType('product')} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${itemType === 'product' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>제품</button>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-grow overflow-hidden">
+          <div className="p-4 sm:p-8 space-y-4 sm:space-y-6 overflow-y-auto">
+            <div className="flex p-1 bg-slate-100 rounded-xl mb-2">
+                <button type="button" onClick={() => setItemType('part')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${itemType === 'part' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>부품</button>
+                <button type="button" onClick={() => setItemType('product')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${itemType === 'product' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>제품</button>
             </div>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
-                    <label htmlFor="registrationDate" className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">날짜</label>
-                    <input type="date" name="registrationDate" id="registrationDate" value={formData.registrationDate} onChange={handleChange} className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold" />
+                    <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">날짜</label>
+                    <input type="date" name="registrationDate" value={formData.registrationDate} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold" />
                 </div>
                 <div>
-                    <label htmlFor="prefix" className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">코드 접두어</label>
-                    <input type="text" id="prefix" value={prefix} onChange={handlePrefixChange} placeholder="예: CT" className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
+                    <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">코드 접두어</label>
+                    <input type="text" value={prefix} onChange={handlePrefixChange} placeholder="예: CT" className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
                 </div>
             </div>
             <div className="relative">
-              <label className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">생성된 코드 (자동/수동)</label>
+              <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">생성된 코드</label>
               <input 
                 type="text" 
                 name="code" 
                 value={formData.code} 
                 onChange={handleChange} 
-                className={`w-full px-5 py-3 rounded-xl text-indigo-600 font-mono font-black text-xl border-2 focus:ring-2 outline-none ${isCodeDuplicate ? 'bg-rose-50 border-rose-500 focus:ring-rose-200' : 'bg-indigo-50/50 border-indigo-100 focus:ring-indigo-500'}`} 
+                className={`w-full px-4 py-2 sm:py-3 rounded-xl text-indigo-600 font-mono font-black text-base sm:text-xl border-2 focus:ring-2 outline-none ${isCodeDuplicate ? 'bg-rose-50 border-rose-500' : 'bg-indigo-50/50 border-indigo-100'}`} 
                 placeholder="코드를 입력하세요" 
               />
-              {isCodeDuplicate && <p className="text-xs text-rose-500 font-black mt-2 uppercase">중복된 코드입니다</p>}
             </div>
             <div>
-              <label htmlFor="name" className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">{itemType === 'part' ? '부품명' : '제품명'} <span className="text-rose-500">*</span></label>
-              <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} required className="w-full px-5 py-3 border-2 border-slate-100 rounded-xl text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
+              <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">품명 <span className="text-rose-500">*</span></label>
+              <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
             </div>
             {itemType === 'part' && (
-              <>
-                <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div>
-                      <label htmlFor="drawingNumber" className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">도번</label>
-                      <input type="text" name="drawingNumber" id="drawingNumber" value={formData.drawingNumber} onChange={handleChange} className="w-full px-5 py-3 border-2 border-slate-100 rounded-xl text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono font-bold" placeholder="도번" />
+                      <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">도번</label>
+                      <input type="text" name="drawingNumber" value={formData.drawingNumber} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono font-bold" />
                   </div>
                   <div>
-                      <label htmlFor="spec" className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">규격</label>
-                      <input type="text" name="spec" id="spec" value={formData.spec} onChange={handleChange} className="w-full px-5 py-3 border-2 border-slate-100 rounded-xl text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold" placeholder="규격" />
+                      <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">규격</label>
+                      <input type="text" name="spec" value={formData.spec} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold" />
                   </div>
-                </div>
-              </>
+              </div>
             )}
             <div>
-              <label htmlFor="initialQuantity" className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">초기 수량</label>
-              <input type="number" name="initialQuantity" id="initialQuantity" min="0" value={formData.initialQuantity} onChange={handleChange} className="w-full px-5 py-3 border-2 border-slate-100 rounded-xl text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
+              <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">초기 수량</label>
+              <input type="number" name="initialQuantity" min="0" value={formData.initialQuantity} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
             </div>
             <div>
-              <label htmlFor="remarks" className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">비고</label>
-              <textarea name="remarks" id="remarks" value={formData.remarks} onChange={handleChange} rows={3} className="w-full px-5 py-3 border-2 border-slate-100 rounded-xl text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold"></textarea>
+              <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">비고</label>
+              <textarea name="remarks" value={formData.remarks} onChange={handleChange} rows={2} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold"></textarea>
             </div>
           </div>
-          <div className="p-8 bg-slate-50 border-t border-slate-100">
-            <button type="submit" className="w-full px-8 py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-widest text-lg">
-              신규 {itemType === 'part' ? '부품' : '제품'} 등록하기
+          <div className="p-4 sm:p-8 bg-slate-50 border-t border-slate-100">
+            <button type="submit" className="w-full py-3 sm:py-5 bg-indigo-600 text-white font-black rounded-xl sm:rounded-2xl shadow-xl hover:bg-indigo-700 transition-all text-sm sm:text-lg uppercase tracking-widest">
+              기록 저장하기
             </button>
           </div>
         </form>

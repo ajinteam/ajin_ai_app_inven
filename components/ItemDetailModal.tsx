@@ -44,7 +44,6 @@ const parseSerialRange = (input: string): string[] => {
   const endNumStr = rangeMatch[4];
   const startNum = parseInt(startNumStr, 10);
   const endNum = parseInt(endNumStr, 10);
-  // Fix: Corrected typo 'iZNaN' to 'isNaN'
   if (isNaN(startNum) || isNaN(endNum) || startNum > endNum) return [input.trim()];
   if (endNum - startNum >= 100) throw new Error('범위는 최대 100개까지 가능합니다.');
   const results: string[] = [];
@@ -169,7 +168,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
   
   const handleActionConfirm = () => {
-    const requiredPass = authRole === 'admin' ? '5200' : '2611'; // Re-using passwords from App context
+    const requiredPass = authRole === 'admin' ? '5200' : '2611';
     if (password !== requiredPass) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
@@ -224,252 +223,244 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-[90vw] flex flex-col h-full max-h-[95vh] overflow-hidden animate-fade-in-up">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] sm:max-w-[90vw] flex flex-col h-full max-h-[98vh] sm:max-h-[95vh] overflow-hidden animate-fade-in-up">
         {showPasswordInput && (
             <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4">
-                <div className="bg-white rounded-[2.5rem] p-12 max-w-md w-full shadow-2xl border border-slate-100 animate-fade-in-up">
-                    <h4 className="text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">권한 인증</h4>
-                    <input type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleActionConfirm()} placeholder="PASSWORD" className="w-full px-6 py-5 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none mb-6 text-center text-3xl font-black tracking-widest" />
+                <div className="bg-white rounded-2xl sm:rounded-[2.5rem] p-8 sm:p-12 max-w-md w-full shadow-2xl border border-slate-100 animate-fade-in-up">
+                    <h4 className="text-xl sm:text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">권한 인증</h4>
+                    <input type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleActionConfirm()} placeholder="PASSWORD" className="w-full px-4 sm:px-6 py-4 sm:py-5 border-2 border-slate-100 rounded-xl sm:rounded-2xl focus:border-indigo-500 outline-none mb-6 text-center text-2xl sm:text-3xl font-black tracking-widest" />
                     <div className="grid grid-cols-2 gap-4">
-                        <button onClick={() => { setShowPasswordInput(null); setPassword(''); }} className="py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm tracking-widest">취소</button>
-                        <button onClick={handleActionConfirm} className="py-4 bg-indigo-600 text-white rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-indigo-100">확인</button>
+                        <button onClick={() => { setShowPasswordInput(null); setPassword(''); }} className="py-3 sm:py-4 bg-slate-100 text-slate-600 rounded-lg sm:rounded-xl font-black uppercase text-xs sm:text-sm tracking-widest">취소</button>
+                        <button onClick={handleActionConfirm} className="py-3 sm:py-4 bg-indigo-600 text-white rounded-lg sm:rounded-xl font-black uppercase text-xs sm:text-sm tracking-widest shadow-lg shadow-indigo-100">확인</button>
                     </div>
                 </div>
             </div>
         )}
-        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div><h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">{item.type === 'part' ? '부품' : '제품'} 상세 및 수불관리</h2></div>
-          <div className="flex gap-4">
-              <button onClick={handleToggleEdit} className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-base font-black transition-all shadow-sm ${isEditing ? 'bg-emerald-500 text-white' : 'bg-white text-indigo-600 border-2 border-indigo-50'}`}>
-                {isEditing ? <CheckIcon className="w-5 h-5" /> : <EditIcon className="w-5 h-5" />}
-                <span>{isEditing ? '정보 저장' : '수정 모드'}</span>
+        <div className="p-4 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div><h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase">재고 상세 관리</h2></div>
+          <div className="flex gap-2 sm:gap-4">
+              <button onClick={handleToggleEdit} className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black transition-all shadow-sm ${isEditing ? 'bg-emerald-500 text-white' : 'bg-white text-indigo-600 border-2 border-indigo-50'}`}>
+                {isEditing ? <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <EditIcon className="w-4 h-4 sm:w-5 sm:h-5" />}
+                <span className="hidden xs:inline">{isEditing ? '저장' : '정보 수정'}</span>
               </button>
-              {isEditing && <button onClick={() => setIsEditing(false)} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl text-base font-black uppercase">취소</button>}
-              <button onClick={onClose} className="p-3 text-slate-400 hover:text-slate-800 transition-colors ml-4"><CloseIcon className="w-10 h-10" /></button>
+              {isEditing && <button onClick={() => setIsEditing(false)} className="px-3 sm:px-6 py-2 sm:py-3 bg-slate-100 text-slate-600 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black uppercase">취소</button>}
+              <button onClick={onClose} className="p-1 sm:p-3 text-slate-400 hover:text-slate-800 transition-colors ml-1 sm:ml-4"><CloseIcon className="w-8 h-8 sm:w-10 sm:h-10" /></button>
           </div>
         </div>
-        <div className="flex-grow overflow-y-auto p-10 grid grid-cols-1 lg:grid-cols-4 gap-12">
-          <div className="lg:col-span-1 space-y-8">
-            <div className="bg-slate-50/80 p-8 rounded-[2rem] border border-slate-100">
+        <div className="flex-grow overflow-y-auto p-4 sm:p-10 grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-12">
+          <div className="lg:col-span-1 space-y-6 sm:space-y-8 order-1">
+            <div className="bg-slate-50/80 p-6 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-slate-100">
               {isEditing ? (
-                <div className="space-y-6">
-                    <div><label className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">품명</label>
-                    <input name="name" value={editFormData.name || ''} onChange={(e) => setEditFormData({...editFormData, name: e.target.value.toUpperCase()})} className="w-full px-4 py-3 border-2 border-indigo-100 bg-white rounded-xl text-lg font-black outline-none" /></div>
-                    <div><label className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">코드</label>
-                    <input name="code" value={editFormData.code || ''} onChange={(e) => setEditFormData({...editFormData, code: e.target.value.toUpperCase()})} className={`w-full px-4 py-3 border-2 rounded-xl text-lg font-mono font-black outline-none ${isCodeDuplicate ? 'border-rose-400 bg-rose-50' : 'border-indigo-100'}`} /></div>
+                <div className="space-y-4 sm:space-y-6">
+                    <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">품명</label>
+                    <input name="name" value={editFormData.name || ''} onChange={(e) => setEditFormData({...editFormData, name: e.target.value.toUpperCase()})} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" /></div>
+                    <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">코드</label>
+                    <input name="code" value={editFormData.code || ''} onChange={(e) => setEditFormData({...editFormData, code: e.target.value.toUpperCase()})} className={`w-full px-4 py-2 sm:py-3 border-2 rounded-xl text-base sm:text-lg font-mono font-black outline-none ${isCodeDuplicate ? 'border-rose-400 bg-rose-50' : 'border-indigo-100'}`} /></div>
                     {item.type === 'part' && (
                       <>
-                        <div><label className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">도번</label>
-                        <input name="drawingNumber" value={editFormData.drawingNumber || ''} onChange={(e) => setEditFormData({...editFormData, drawingNumber: e.target.value})} className="w-full px-4 py-3 border-2 border-indigo-100 rounded-xl text-lg font-mono font-bold" /></div>
-                        <div><label className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">규격</label>
-                        <input name="spec" value={editFormData.spec || ''} onChange={(e) => setEditFormData({...editFormData, spec: e.target.value})} className="w-full px-4 py-3 border-2 border-indigo-100 rounded-xl text-lg font-bold" /></div>
+                        <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">도번</label>
+                        <input name="drawingNumber" value={editFormData.drawingNumber || ''} onChange={(e) => setEditFormData({...editFormData, drawingNumber: e.target.value})} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 rounded-xl text-base sm:text-lg font-mono font-bold" /></div>
+                        <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">규격</label>
+                        <input name="spec" value={editFormData.spec || ''} onChange={(e) => setEditFormData({...editFormData, spec: e.target.value})} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 rounded-xl text-base sm:text-lg font-bold" /></div>
                       </>
                     )}
-                    <div><label className="block text-sm uppercase font-black text-slate-400 mb-2 tracking-widest">비고</label>
-                    <textarea name="remarks" value={editFormData.remarks || ''} onChange={(e) => setEditFormData({...editFormData, remarks: e.target.value})} rows={3} className="w-full px-4 py-3 border-2 border-indigo-100 rounded-xl text-lg font-bold" /></div>
+                    <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">비고</label>
+                    <textarea name="remarks" value={editFormData.remarks || ''} onChange={(e) => setEditFormData({...editFormData, remarks: e.target.value})} rows={2} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 rounded-xl text-base sm:text-lg font-bold" /></div>
                 </div>
               ) : (
                 <>
-                  <h3 className="text-3xl font-black text-slate-800 mb-6 break-all leading-tight uppercase tracking-tight">{item.name}</h3>
-                  <div className="space-y-4 text-lg">
-                    <div className="flex justify-between border-b-2 border-slate-100 pb-3"><span className="text-slate-400 font-black uppercase text-xs">Code</span><span className="font-mono font-black text-indigo-600">{item.code}</span></div>
+                  <h3 className="text-2xl sm:text-3xl font-black text-slate-800 mb-4 sm:mb-6 break-all leading-tight uppercase tracking-tight">{item.name}</h3>
+                  <div className="space-y-3 sm:space-y-4 text-sm sm:text-lg">
+                    <div className="flex justify-between border-b-2 border-slate-100 pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Code</span><span className="font-mono font-black text-indigo-600">{item.code}</span></div>
                     {item.type === 'part' && (
                       <>
-                        <div className="flex justify-between border-b-2 border-slate-100 pb-3"><span className="text-slate-400 font-black uppercase text-xs">Drawing</span><span className="font-mono font-bold text-slate-500">{item.drawingNumber || '-'}</span></div>
-                        <div className="flex justify-between border-b-2 border-slate-100 pb-3"><span className="text-slate-400 font-black uppercase text-xs">Spec</span><span className="font-bold text-slate-500">{item.spec || '-'}</span></div>
+                        <div className="flex justify-between border-b-2 border-slate-100 pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Drawing</span><span className="font-mono font-bold text-slate-500">{item.drawingNumber || '-'}</span></div>
+                        <div className="flex justify-between border-b-2 border-slate-100 pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Spec</span><span className="font-bold text-slate-500 text-right">{item.spec || '-'}</span></div>
                       </>
                     )}
-                    <div className="flex justify-between pb-3"><span className="text-slate-400 font-black uppercase text-xs">Reg Date</span><span className="font-bold text-slate-500">{item.registrationDate}</span></div>
-                    {item.remarks && (<div className="mt-6 p-5 bg-white rounded-2xl border border-slate-100 text-slate-600 font-bold leading-relaxed italic text-base">"{item.remarks}"</div>)}
+                    <div className="flex justify-between pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Reg Date</span><span className="font-bold text-slate-500">{item.registrationDate}</span></div>
+                    {item.remarks && (<div className="mt-4 p-4 bg-white rounded-xl border border-slate-100 text-slate-600 font-bold leading-relaxed italic text-sm">"{item.remarks}"</div>)}
                   </div>
                 </>
               )}
-              <div className="mt-10 pt-8 border-t-2 border-slate-200">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Total Stock</p>
-                <p className="text-7xl font-black text-slate-900 leading-none">{currentStock.toLocaleString()} <span className="text-2xl text-slate-300 font-black uppercase">EA</span></p>
+              <div className="mt-6 sm:mt-10 pt-6 sm:pt-8 border-t-2 border-slate-200">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 sm:mb-3 text-center sm:text-left">Total Stock</p>
+                <p className="text-5xl sm:text-7xl font-black text-slate-900 leading-none text-center sm:text-left">{currentStock.toLocaleString()} <span className="text-xl sm:text-2xl text-slate-300 font-black uppercase">EA</span></p>
               </div>
             </div>
             {!isEditing && (
-              <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl space-y-6">
-                  <h3 className="text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><PlusIcon className="w-5 h-5"/> 신규 입출고 기록</h3>
-                  <form onSubmit={handleAddTransaction} className="space-y-5">
-                      <div className="flex p-1.5 bg-slate-100 rounded-2xl">
-                          <button type="button" onClick={() => setTransactionType('purchase')} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${transactionType === 'purchase' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>입고</button>
-                          <button type="button" onClick={() => setTransactionType('release')} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${transactionType === 'release' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400'}`}>출고</button>
+              <div className="bg-white p-6 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-slate-100 shadow-xl space-y-4 sm:space-y-6 order-2 lg:order-none">
+                  <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><PlusIcon className="w-4 h-4 sm:w-5 sm:h-5"/> 입출고 기록</h3>
+                  <form onSubmit={handleAddTransaction} className="space-y-4 sm:space-y-5">
+                      <div className="flex p-1 bg-slate-100 rounded-xl">
+                          <button type="button" onClick={() => setTransactionType('purchase')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${transactionType === 'purchase' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>입고</button>
+                          <button type="button" onClick={() => setTransactionType('release')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${transactionType === 'release' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400'}`}>출고</button>
                       </div>
-                      <div className="space-y-4">
+                      <div className="space-y-3 sm:space-y-4">
                         {item.type === 'product' ? (
                           <>
                             <div className="relative">
-                                <div className="flex justify-between items-center mb-2">
-                                  <label className="text-xs font-black uppercase text-slate-400 tracking-widest">일련번호 (범위: CT0001~0010)</label>
-                                  <button type="button" onClick={() => setSerialNumber(suggestNextSerial(allUsedSerials))} className="text-[10px] font-black text-indigo-600 underline">다음번호 제안</button>
+                                <div className="flex justify-between items-center mb-1.5">
+                                  <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest">일련번호 (범위: SN001~010)</label>
+                                  <button type="button" onClick={() => setSerialNumber(suggestNextSerial(allUsedSerials))} className="text-[8px] sm:text-[10px] font-black text-indigo-600 underline">제안</button>
                                 </div>
-                                <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="예: AJP00001~00005" className={`w-full px-4 py-3 text-lg border-2 rounded-xl font-black outline-none focus:ring-4 ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
-                                {serialNumber.includes('~') && (
-                                  <div className="flex items-center gap-1.5 mt-2 px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-lg animate-pulse">
-                                    <SyncIcon className="w-2.5 h-2.5 text-indigo-500" />
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter">자동 범위 등록 모드 활성화</p>
-                                  </div>
-                                )}
+                                <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="예: AJP00001~00005" className={`w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 rounded-xl font-black outline-none ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                 <div className="relative">
-                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required disabled={serialNumber.includes('~')} className={`w-full px-4 py-3 text-lg border-2 rounded-xl font-black outline-none ${serialNumber.includes('~') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'border-slate-100 focus:border-indigo-400'}`} />
-                                  {serialNumber.includes('~') && <p className="absolute -bottom-4 left-0 text-[8px] font-bold text-slate-400 uppercase">범위에 의해 자동 설정됨</p>}
+                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required disabled={serialNumber.includes('~')} className={`w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 rounded-xl font-black outline-none ${serialNumber.includes('~') ? 'bg-slate-100 text-slate-400 border-slate-200' : 'border-slate-100 focus:border-indigo-400'}`} />
                                 </div>
-                                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                             </div>
-                            <input type="text" value={transUserId} onChange={(e) => setTransUserId(e.target.value)} placeholder="아이디" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
-                            <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
-                            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="배송 주소" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                            <input type="text" value={transUserId} onChange={(e) => setTransUserId(e.target.value)} placeholder="아이디" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                            <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="배송 주소" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                           </>
                         ) : (
-                          <div className="grid grid-cols-2 gap-4">
-                            <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
-                            <input type="text" value={transModelName} onChange={(e) => setTransModelName(e.target.value)} placeholder="기종" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
+                            <input type="text" value={transModelName} onChange={(e) => setTransModelName(e.target.value)} placeholder="기종" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                           </div>
                         )}
-                        <input type="text" value={transRemarks} onChange={(e) => setTransRemarks(e.target.value)} placeholder="사유 / 비고" className="w-full px-4 py-3 text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                        <input type="text" value={transRemarks} onChange={(e) => setTransRemarks(e.target.value)} placeholder="사유 / 비고" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                       </div>
-                      <button type="submit" className={`w-full py-5 text-white text-lg font-black rounded-2xl shadow-xl transition-all active:scale-95 ${transactionType === 'purchase' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-rose-600 hover:bg-rose-700'} uppercase tracking-widest`}>
-                        데이터 {serialNumber.includes('~') ? '일괄' : '' } 저장
+                      <button type="submit" className={`w-full py-4 text-white text-base sm:text-lg font-black rounded-xl sm:rounded-2xl shadow-lg transition-all ${transactionType === 'purchase' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-rose-600 hover:bg-rose-700'} uppercase tracking-widest`}>
+                        {serialNumber.includes('~') ? '일괄 저장' : '데이터 저장' }
                       </button>
                   </form>
               </div>
             )}
           </div>
-          <div className="lg:col-span-3 flex flex-col">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <div className="flex items-center gap-6">
-                <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">수불 히스토리</h3>
-                <div className="relative w-64">
+          <div className="lg:col-span-3 flex flex-col order-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-6 w-full">
+                <h3 className="text-sm sm:text-lg font-black text-slate-800 uppercase tracking-widest">수불 히스토리</h3>
+                <div className="relative w-full sm:w-64">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3"><SearchIcon className="text-slate-400 w-4 h-4" /></span>
                     <input
                         type="text" value={historySearchTerm} onChange={(e) => setHistorySearchTerm(e.target.value)}
-                        placeholder="일련번호, 대상자, 아이디 검색..."
-                        className="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-indigo-300 bg-white text-sm font-bold"
+                        placeholder="번호, 대상자, 아이디 검색..."
+                        className="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-lg sm:rounded-xl focus:outline-none focus:border-indigo-300 bg-white text-xs sm:text-sm font-bold"
                     />
                 </div>
               </div>
-              <button onClick={exportHistoryToExcel} className="flex items-center gap-2 px-5 py-3 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-2xl text-sm font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-md">
-                <DownloadIcon className="w-5 h-5" /><span>목록 내보내기</span></button>
+              <button onClick={exportHistoryToExcel} className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-xl text-xs font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-sm">
+                <DownloadIcon className="w-4 h-4" /><span>내역 내보내기</span></button>
             </div>
-            <div className="flex-grow border-2 border-slate-100 rounded-[2rem] overflow-hidden bg-slate-50/50">
-                <div className="h-full max-h-[calc(90vh-220px)] overflow-y-auto">
+            <div className="flex-grow border-2 border-slate-100 rounded-2xl sm:rounded-[2rem] overflow-hidden bg-slate-50/50 h-[400px] lg:h-auto">
+                <div className="h-full overflow-y-auto scrollbar-hide">
                     {filteredHistory.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full p-20 opacity-20">
-                        <BoxIcon className="w-24 h-24 mb-4" />
-                        <p className="text-xl font-black uppercase tracking-widest">
-                          {historySearchTerm ? '검색 결과가 없습니다' : '기록된 내역이 없습니다'}
+                      <div className="flex flex-col items-center justify-center h-full p-10 opacity-20">
+                        <BoxIcon className="w-16 h-16 sm:w-24 sm:h-24 mb-4" />
+                        <p className="text-sm sm:text-xl font-black uppercase tracking-widest text-center">
+                          기록된 내역이 없습니다
                         </p>
                       </div>
                     ) : (
-                        <div className="overflow-x-auto"><table className="w-full text-left text-base">
-                            <thead className="bg-white border-b-2 border-slate-100 text-sm font-black uppercase text-slate-400 sticky top-0 z-10">
+                        <div className="overflow-x-auto scrollbar-hide">
+                          <table className="w-full text-left min-w-[800px]">
+                            <thead className="bg-white border-b-2 border-slate-100 text-[10px] sm:text-sm font-black uppercase text-slate-400 sticky top-0 z-10">
                               <tr>
-                                <th className="px-6 py-5">날짜 / 구분</th>
-                                <th className="px-6 py-5">수량</th>
-                                {item.type === 'part' && <th className="px-6 py-5">기종</th>}
+                                <th className="px-4 sm:px-6 py-4 sm:py-5">날짜 / 구분</th>
+                                <th className="px-4 sm:px-6 py-4 sm:py-5">수량</th>
+                                {item.type === 'part' && <th className="px-4 sm:px-6 py-4 sm:py-5">기종</th>}
                                 {item.type === 'product' && (
                                   <>
-                                    <th className="px-6 py-5">일련번호</th>
-                                    <th className="px-6 py-5">대상자/ID</th>
-                                    <th className="px-6 py-5">주소</th>
+                                    <th className="px-4 sm:px-6 py-4 sm:py-5">일련번호</th>
+                                    <th className="px-4 sm:px-6 py-4 sm:py-5">대상자/ID</th>
+                                    <th className="px-4 sm:px-6 py-4 sm:py-5">주소</th>
                                   </>
                                 )}
-                                <th className="px-6 py-5">비고</th>
-                                <th className="px-6 py-5 text-center">작업</th>
+                                <th className="px-4 sm:px-6 py-4 sm:py-5">비고</th>
+                                <th className="px-4 sm:px-6 py-4 sm:py-5 text-center">작업</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y-2 divide-white">
                                 {filteredHistory.map(t => (
                                     <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''}`}>
-                                        <td className="px-6 py-6">
-                                          <div className="flex items-center gap-4">
-                                            <div className={`p-2 rounded-xl ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                                              {t.type === 'purchase' ? <ArrowUpIcon className="w-5 h-5"/> : <ArrowDownIcon className="w-5 h-5"/>}
+                                        <td className="px-4 sm:px-6 py-4 sm:py-6">
+                                          <div className="flex items-center gap-3 sm:gap-4">
+                                            <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                              {t.type === 'purchase' ? <ArrowUpIcon className="w-4 h-4 sm:w-5 sm:h-5"/> : <ArrowDownIcon className="w-4 h-4 sm:w-5 sm:h-5"/>}
                                             </div>
                                             <div>
-                                              <p className="font-black text-slate-700 text-lg">{new Date(t.date).toLocaleDateString()}</p>
-                                              <p className="text-xs text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString()}</p>
+                                              <p className="font-black text-slate-700 text-sm sm:text-lg">{new Date(t.date).toLocaleDateString()}</p>
+                                              <p className="text-[10px] text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                                             </div>
                                           </div>
                                         </td>
-                                        <td className="px-6 py-6">
+                                        <td className="px-4 sm:px-6 py-4 sm:py-6">
                                           {editingTransactionId === t.id ? (
-                                            <input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-24 px-3 py-2 border-2 rounded-xl bg-white font-black text-lg" />
+                                            <input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-20 sm:w-24 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white font-black text-sm sm:text-lg" />
                                           ) : (
-                                            <span className={`font-black text-2xl ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            <span className={`font-black text-lg sm:text-2xl ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                               {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
                                             </span>
                                           )}
                                         </td>
                                         {item.type === 'part' && (
-                                          <td className="px-6 py-6">
+                                          <td className="px-4 sm:px-6 py-4 sm:py-6">
                                             {editingTransactionId === t.id ? (
-                                              <input name="modelName" value={transEditData.modelName || ''} onChange={handleTransEditChange} className="w-32 px-3 py-2 border-2 rounded-xl bg-white" />
+                                              <input name="modelName" value={transEditData.modelName || ''} onChange={handleTransEditChange} className="w-24 sm:w-32 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white" />
                                             ) : (
-                                              <span className="font-black text-slate-600">{t.modelName || '-'}</span>
+                                              <span className="font-black text-slate-600 text-sm sm:text-base">{t.modelName || '-'}</span>
                                             )}
                                           </td>
                                         )}
                                         {item.type === 'product' && (
                                           <>
-                                            <td className="px-6 py-6">
+                                            <td className="px-4 sm:px-6 py-4 sm:py-6">
                                               {editingTransactionId === t.id ? (
-                                                <input name="serialNumber" value={transEditData.serialNumber || ''} onChange={handleTransEditChange} className="w-32 px-3 py-2 border-2 rounded-xl bg-white font-black uppercase" />
+                                                <input name="serialNumber" value={transEditData.serialNumber || ''} onChange={handleTransEditChange} className="w-24 sm:w-32 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white font-black uppercase text-xs sm:text-base" />
                                               ) : (
-                                                <span className="font-mono font-black text-indigo-600 text-lg">{t.serialNumber || '-'}</span>
+                                                <span className="font-mono font-black text-indigo-600 text-xs sm:text-lg">{t.serialNumber || '-'}</span>
                                               )}
                                             </td>
-                                            <td className="px-6 py-6">
+                                            <td className="px-4 sm:px-6 py-4 sm:py-6">
                                               {editingTransactionId === t.id ? (
-                                                <div className="space-y-2">
-                                                  <input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
-                                                  <input name="userId" value={transEditData.userId || ''} onChange={handleTransEditChange} placeholder="ID" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
-                                                  <input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
+                                                <div className="space-y-1">
+                                                  <input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
+                                                  <input name="userId" value={transEditData.userId || ''} onChange={handleTransEditChange} placeholder="ID" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
                                                 </div>
                                               ) : (
                                                 <>
-                                                  <div className="flex items-center gap-2">
-                                                    <p className="font-black text-slate-800 text-lg">{t.customerName || '-'}</p>
-                                                    {t.userId && <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-1.5 py-0.5 rounded uppercase">{t.userId}</span>}
+                                                  <div className="flex items-center gap-1.5">
+                                                    <p className="font-black text-slate-800 text-xs sm:text-lg">{t.customerName || '-'}</p>
+                                                    {t.userId && <span className="bg-slate-100 text-slate-500 text-[8px] sm:text-[10px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
                                                   </div>
-                                                  <p className="text-slate-400 font-bold text-sm">{t.phoneNumber || '-'}</p>
+                                                  <p className="text-slate-400 font-bold text-[10px] sm:text-sm">{t.phoneNumber || '-'}</p>
                                                 </>
                                               )}
                                             </td>
-                                            <td className="px-6 py-6">
+                                            <td className="px-4 sm:px-6 py-4 sm:py-6">
                                               {editingTransactionId === t.id ? (
-                                                <input name="address" value={transEditData.address || ''} onChange={handleTransEditChange} placeholder="주소" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
+                                                <input name="address" value={transEditData.address || ''} onChange={handleTransEditChange} placeholder="주소" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
                                               ) : (
-                                                <p className="text-slate-500 font-bold truncate max-w-[200px]" title={t.address}>{t.address || '-'}</p>
+                                                <p className="text-slate-500 font-bold text-[10px] sm:text-sm truncate max-w-[150px] sm:max-w-[200px]" title={t.address}>{t.address || '-'}</p>
                                               )}
                                             </td>
                                           </>
                                         )}
-                                        <td className="px-6 py-6">
+                                        <td className="px-4 sm:px-6 py-4 sm:py-6">
                                           {editingTransactionId === t.id ? (
-                                            <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-3 py-2 border-2 rounded-xl bg-white" />
+                                            <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
                                           ) : (
-                                            <p className="text-sm text-slate-400 font-black truncate max-w-[250px]">{t.remarks || '-'}</p>
+                                            <p className="text-[10px] sm:text-sm text-slate-400 font-black truncate max-w-[150px] sm:max-w-[250px]">{t.remarks || '-'}</p>
                                           )}
                                         </td>
-                                        <td className="px-6 py-6 text-center">
-                                          <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <td className="px-4 sm:px-6 py-4 sm:py-6 text-center">
+                                          <div className="flex items-center justify-center gap-1 sm:gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
                                             {editingTransactionId === t.id ? (
                                               <>
-                                                <button onClick={() => handleSaveTransEdit(t.id)} className="p-3 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"><CheckIcon className="w-6 h-6" /></button>
-                                                <button onClick={() => setEditingTransactionId(null)} className="p-3 text-slate-400 hover:bg-slate-50 rounded-xl transition-all"><CloseIcon className="w-6 h-6" /></button>
+                                                <button onClick={() => handleSaveTransEdit(t.id)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"><CheckIcon className="w-5 h-5" /></button>
+                                                <button onClick={() => setEditingTransactionId(null)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-lg"><CloseIcon className="w-5 h-5" /></button>
                                               </>
                                             ) : (
                                               <>
-                                                <button onClick={() => handleEditTransaction(t)} className="p-3 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><EditIcon className="w-6 h-6" /></button>
-                                                {/* Only Admin can delete transactions */}
+                                                <button onClick={() => handleEditTransaction(t)} className="p-2 text-indigo-400 hover:text-indigo-600 rounded-lg"><EditIcon className="w-4 h-4 sm:w-6 sm:h-6" /></button>
                                                 {authRole === 'admin' && (
-                                                  <button onClick={() => handleDeleteTrans(t.id)} className="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><TrashIcon className="w-6 h-6" /></button>
+                                                  <button onClick={() => handleDeleteTrans(t.id)} className="p-2 text-rose-400 hover:text-rose-600 rounded-lg"><TrashIcon className="w-4 h-4 sm:w-6 sm:h-6" /></button>
                                                 )}
                                               </>
                                             )}
@@ -478,7 +469,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                     </tr>
                                 ))}
                             </tbody>
-                        </table></div>
+                        </table>
+                      </div>
                     )}
                 </div>
             </div>
