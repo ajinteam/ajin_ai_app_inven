@@ -13,6 +13,7 @@ interface AddItemModalProps {
 const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existingCodes, defaultType }) => {
   const [prefix, setPrefix] = useState('');
   const [itemType, setItemType] = useState<'part' | 'product'>(defaultType);
+  const [productCategory, setProductCategory] = useState<'GiL' | 'KATO' | 'TOMIX'>('GiL');
   const [formData, setFormData] = useState({
     registrationDate: new Date().toISOString().split('T')[0],
     code: '',
@@ -73,6 +74,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
     onAddItem({
       ...rest,
       type: itemType,
+      category: itemType === 'product' ? productCategory : undefined,
       modelName: '',
       application: ''
     }, quantity);
@@ -94,6 +96,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
                 <button type="button" onClick={() => setItemType('part')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${itemType === 'part' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>부품</button>
                 <button type="button" onClick={() => setItemType('product')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${itemType === 'product' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>제품</button>
             </div>
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                     <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">날짜</label>
@@ -115,6 +118,29 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
                 placeholder="코드를 입력하세요" 
               />
             </div>
+
+            {itemType === 'product' && (
+              <div>
+                <label className="block text-[10px] uppercase font-black text-slate-400 mb-2 tracking-widest">제품 카테고리 (하위목록)</label>
+                <div className="flex gap-2">
+                  {['GiL', 'KATO', 'TOMIX'].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setProductCategory(cat as any)}
+                      className={`flex-1 py-3 rounded-xl text-xs font-black border-2 transition-all ${
+                        productCategory === cat 
+                        ? 'bg-indigo-50 border-indigo-600 text-indigo-600' 
+                        : 'bg-white border-slate-100 text-slate-400'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">품명 <span className="text-rose-500">*</span></label>
               <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />

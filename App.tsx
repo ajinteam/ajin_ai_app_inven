@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [authRole, setAuthRole] = useState<'admin' | 'product_only' | null>(null);
   const [loginPassword, setLoginPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'part' | 'product'>('part');
+  const [activeProductSubCategory, setActiveProductSubCategory] = useState<'ALL' | 'GiL' | 'KATO' | 'TOMIX'>('ALL');
   
   const [items, setItems] = useState<Item[]>([]);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
@@ -245,21 +246,27 @@ const App: React.FC = () => {
     return items.filter(item => {
         const matchesTab = (activeTab === 'part' && item.type === 'part') || (activeTab === 'product' && item.type === 'product');
         if (!matchesTab) return false;
+        
+        // Product sub-category filter
+        if (activeTab === 'product' && activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) {
+          return false;
+        }
+
         const basicMatch = item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term);
         if (basicMatch) return true;
         if (activeTab === 'product') return item.transactions.some(t => t.serialNumber?.toLowerCase().includes(term));
         return false;
     });
-  }, [items, searchTerm, activeTab]);
+  }, [items, searchTerm, activeTab, activeProductSubCategory]);
 
   const exportToExcel = () => {
     let csvContent = "\ufeff";
-    const headers = activeTab === 'part' ? ['코드', '품명', '도번', '현재재고'] : ['코드', '제품명', '현재재고'];
+    const headers = activeTab === 'part' ? ['코드', '품명', '도번', '현재재고'] : ['카테고리', '코드', '제품명', '현재재고'];
     csvContent += headers.join(',') + '\r\n';
     filteredInventory.forEach(item => {
       const row = activeTab === 'part' 
         ? [item.code, item.name, item.drawingNumber, calculateStock(item)]
-        : [item.code, item.name, calculateStock(item)];
+        : [item.category || '-', item.code, item.name, calculateStock(item)];
       csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\r\n';
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -347,6 +354,24 @@ const App: React.FC = () => {
       </header>
 
       <main className="container mx-auto p-4 sm:p-8">
+        {activeTab === 'product' && (
+          <div className="flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar pb-2">
+            {['ALL', 'GiL', 'KATO', 'TOMIX'].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveProductSubCategory(cat as any)}
+                className={`px-6 py-2 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest border-2 transition-all shadow-sm ${
+                  activeProductSubCategory === cat 
+                  ? 'bg-indigo-600 border-indigo-600 text-white' 
+                  : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-100'
+                }`}
+              >
+                {cat === 'ALL' ? '전체 제품' : cat}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4 sm:gap-6 mb-6 sm:mb-10">
           <div className="relative flex-grow max-w-3xl w-full">
               <span className="absolute inset-y-0 left-0 flex items-center pl-4 sm:pl-5"><SearchIcon className="text-slate-400 w-5 h-5 sm:w-6 sm:h-6" /></span>
@@ -377,14 +402,18 @@ const App: React.FC = () => {
                 <tr>
                   <th className="px-4 sm:px-10 py-4 sm:py-7">품목 코드</th>
                   <th className="px-4 sm:px-10 py-4 sm:py-7">품명 / 제품명</th>
-                  {activeTab === 'part' && <th className="px-4 sm:px-10 py-4 sm:py-7">도번</th>}
+                  {activeTab === 'part' ? (
+                    <th className="px-4 sm:px-10 py-4 sm:py-7">도번</th>
+                  ) : (
+                    <th className="px-4 sm:px-10 py-4 sm:py-7">브랜드</th>
+                  )}
                   <th className="px-4 sm:px-10 py-4 sm:py-7 text-right">재고수량</th>
                   <th className="px-4 sm:px-10 py-4 sm:py-7 text-center">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filteredInventory.length === 0 ? (
-                  <tr><td colSpan={activeTab === 'part' ? 5 : 4} className="px-10 py-16 sm:py-24 text-center text-slate-300 font-black uppercase tracking-widest italic text-xl sm:text-2xl">기록된 데이터가 없습니다</td></tr>
+                  <tr><td colSpan={activeTab === 'part' ? 5 : 5} className="px-10 py-16 sm:py-24 text-center text-slate-300 font-black uppercase tracking-widest italic text-xl sm:text-2xl">기록된 데이터가 없습니다</td></tr>
                 ) : (
                   filteredInventory.map(item => {
                     const stock = calculateStock(item);
@@ -392,7 +421,13 @@ const App: React.FC = () => {
                       <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
                         <td className="px-4 sm:px-10 py-4 sm:py-7 font-mono text-indigo-600 font-black text-base sm:text-xl">{item.code}</td>
                         <td className="px-4 sm:px-10 py-4 sm:py-7 font-black text-slate-800 text-sm sm:text-lg">{item.name}</td>
-                        {activeTab === 'part' && <td className="px-4 sm:px-10 py-4 sm:py-7 text-slate-400 font-mono text-[10px] sm:text-sm uppercase font-bold">{item.drawingNumber || '-'}</td>}
+                        {activeTab === 'part' ? (
+                          <td className="px-4 sm:px-10 py-4 sm:py-7 text-slate-400 font-mono text-[10px] sm:text-sm uppercase font-bold">{item.drawingNumber || '-'}</td>
+                        ) : (
+                          <td className="px-4 sm:px-10 py-4 sm:py-7">
+                            <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-wider">{item.category || '-'}</span>
+                          </td>
+                        )}
                         <td className="px-4 sm:px-10 py-4 sm:py-7 text-right">
                             <span className={`text-xl sm:text-4xl font-black ${stock > 0 ? 'text-slate-900' : 'text-rose-500 animate-pulse'}`}>
                                 {stock.toLocaleString()} <span className="text-[10px] sm:text-xs uppercase text-slate-400 ml-1">EA</span>

@@ -84,7 +84,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   useEffect(() => {
     setEditFormData({
       name: item.name, code: item.code, modelName: item.modelName, application: item.application,
-      drawingNumber: item.drawingNumber, spec: item.spec || '', remarks: item.remarks, registrationDate: item.registrationDate
+      drawingNumber: item.drawingNumber, spec: item.spec || '', remarks: item.remarks, registrationDate: item.registrationDate,
+      category: item.category
     });
   }, [item]);
 
@@ -255,6 +256,20 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <div className="space-y-4 sm:space-y-6">
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">품명</label>
                     <input name="name" value={editFormData.name || ''} onChange={(e) => setEditFormData({...editFormData, name: e.target.value.toUpperCase()})} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" /></div>
+                    {item.type === 'product' && (
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">카테고리</label>
+                        <select 
+                          value={editFormData.category || 'GiL'} 
+                          onChange={(e) => setEditFormData({...editFormData, category: e.target.value as any})}
+                          className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none"
+                        >
+                          <option value="GiL">GiL</option>
+                          <option value="KATO">KATO</option>
+                          <option value="TOMIX">TOMIX</option>
+                        </select>
+                      </div>
+                    )}
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">코드</label>
                     <input name="code" value={editFormData.code || ''} onChange={(e) => setEditFormData({...editFormData, code: e.target.value.toUpperCase()})} className={`w-full px-4 py-2 sm:py-3 border-2 rounded-xl text-base sm:text-lg font-mono font-black outline-none ${isCodeDuplicate ? 'border-rose-400 bg-rose-50' : 'border-indigo-100'}`} /></div>
                     {item.type === 'part' && (
@@ -272,6 +287,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <>
                   <h3 className="text-2xl sm:text-3xl font-black text-slate-800 mb-4 sm:mb-6 break-all leading-tight uppercase tracking-tight">{item.name}</h3>
                   <div className="space-y-3 sm:space-y-4 text-sm sm:text-lg">
+                    {item.type === 'product' && (
+                      <div className="flex justify-between border-b-2 border-slate-100 pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Category</span><span className="font-black text-indigo-600 uppercase">{item.category}</span></div>
+                    )}
                     <div className="flex justify-between border-b-2 border-slate-100 pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Code</span><span className="font-mono font-black text-indigo-600">{item.code}</span></div>
                     {item.type === 'part' && (
                       <>
@@ -422,6 +440,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                                 <div className="space-y-1">
                                                   <input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
                                                   <input name="userId" value={transEditData.userId || ''} onChange={handleTransEditChange} placeholder="ID" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
+                                                  <input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
                                                 </div>
                                               ) : (
                                                 <>
@@ -459,6 +478,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                             ) : (
                                               <>
                                                 <button onClick={() => handleEditTransaction(t)} className="p-2 text-indigo-400 hover:text-indigo-600 rounded-lg"><EditIcon className="w-4 h-4 sm:w-6 sm:h-6" /></button>
+                                                {/* Only Admin can delete transactions */}
                                                 {authRole === 'admin' && (
                                                   <button onClick={() => handleDeleteTrans(t.id)} className="p-2 text-rose-400 hover:text-rose-600 rounded-lg"><TrashIcon className="w-4 h-4 sm:w-6 sm:h-6" /></button>
                                                 )}
@@ -469,7 +489,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                     </tr>
                                 ))}
                             </tbody>
-                        </table>
+                          </table>
                       </div>
                     )}
                 </div>
