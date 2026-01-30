@@ -169,7 +169,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
   
   const handleActionConfirm = () => {
-    const requiredPass = authRole === 'admin' ? '5200' : '2611';
+    const requiredPass = authRole === 'admin' ? '5200' : '2611' ;
     if (password !== requiredPass) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);

@@ -1,5 +1,4 @@
 
-
 export interface Transaction {
   id: string;
   type: 'purchase' | 'release';
@@ -17,6 +16,7 @@ export interface Transaction {
 export interface Item {
   id: string;
   type: 'part' | 'product'; // 부품 또는 제품 구분
+  category?: 'GiL' | 'KATO' | 'TOMIX'; // 제품 카테고리 추가
   registrationDate: string; // 등록일
   code: string; // 품번 (코드)
   name: string; // 품명
@@ -28,7 +28,6 @@ export interface Item {
   transactions: Transaction[];
 }
 
-// Fix: Added missing OrderedPart interface to resolve "no exported member" errors in modal components
 export interface OrderedPart {
   id: string;
   registrationDate: string;
@@ -38,4 +37,12 @@ export interface OrderedPart {
   spec: string;
   unitPrice: number;
   remarks: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  password: string;
+  partPermission: 'read' | 'edit' | 'none';
+  productPermission: 'read' | 'edit' | 'none';
 }
