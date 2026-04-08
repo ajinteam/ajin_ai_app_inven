@@ -567,7 +567,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   onChange={(e) => setReturnReason(e.target.value)}
                   className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400"
                 >
-                  {['도장불량', '파손', '소비자과실', '부품누락', '인쇄불량', '사출불량', '기타'].map(r => (
+                  {['도장불량', '부품파손', '소비자과실', '부품누락', '인쇄불량', '사출불량', '페인트까짐', '표면얼룩', '기타'].map(r => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
