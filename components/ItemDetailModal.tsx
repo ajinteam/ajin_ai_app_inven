@@ -115,7 +115,18 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const filteredHistory = useMemo(() => {
     const term = historySearchTerm.toLowerCase().trim();
     if (!term) return [...item.transactions].reverse();
-    return [...item.transactions].reverse().filter(t => 
+    
+    const allTrans = [...item.transactions].reverse();
+    
+    // Exact serial match priority
+    const exactMatches = allTrans.filter(t => 
+      t.serialNumber?.toLowerCase() === term || 
+      t.originalSerialNumber?.toLowerCase() === term
+    );
+    
+    if (exactMatches.length > 0) return exactMatches;
+    
+    return allTrans.filter(t => 
       t.serialNumber?.toLowerCase().includes(term) || 
       t.originalSerialNumber?.toLowerCase().includes(term) ||
       t.customerName?.toLowerCase().includes(term) ||
@@ -413,103 +424,103 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                           <table className="w-full text-left min-w-[800px]">
                             <thead className="bg-white border-b-2 border-slate-100 text-[10px] sm:text-sm font-black uppercase text-slate-400 sticky top-0 z-10">
                               <tr>
-                                <th className="px-4 sm:px-6 py-4 sm:py-5">날짜 / 구분</th>
-                                <th className="px-4 sm:px-6 py-4 sm:py-5">수량</th>
-                                {item.type === 'part' && <th className="px-4 sm:px-6 py-4 sm:py-5">기종</th>}
+                                <th className="px-2 sm:px-4 py-3 sm:py-4">날짜 / 구분</th>
+                                <th className="px-2 sm:px-4 py-3 sm:py-4">수량</th>
+                                {item.type === 'part' && <th className="px-2 sm:px-4 py-3 sm:py-4">기종</th>}
                                 {item.type === 'product' && (
                                   <>
-                                    <th className="px-4 sm:px-6 py-4 sm:py-5">일련번호</th>
-                                    <th className="px-4 sm:px-6 py-4 sm:py-5">대상자/ID</th>
-                                    <th className="px-4 sm:px-6 py-4 sm:py-5">주소</th>
+                                    <th className="px-2 sm:px-4 py-3 sm:py-4">일련번호</th>
+                                    <th className="px-2 sm:px-4 py-3 sm:py-4">대상자/ID</th>
+                                    <th className="px-2 sm:px-4 py-3 sm:py-4">주소</th>
                                   </>
                                 )}
-                                <th className="px-4 sm:px-6 py-4 sm:py-5">비고</th>
-                                <th className="px-4 sm:px-6 py-4 sm:py-5 text-center">작업</th>
+                                <th className="px-2 sm:px-4 py-3 sm:py-4">비고</th>
+                                <th className="px-2 sm:px-4 py-3 sm:py-4 text-center sticky right-0 bg-white z-10 border-l-2 border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">작업</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y-2 divide-white">
                                 {filteredHistory.map(t => (
                                     <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''}`}>
-                                        <td className="px-4 sm:px-6 py-4 sm:py-6">
-                                          <div className="flex items-center gap-3 sm:gap-4">
-                                            <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                                              {t.type === 'purchase' ? <ArrowUpIcon className="w-4 h-4 sm:w-5 sm:h-5"/> : <ArrowDownIcon className="w-4 h-4 sm:w-5 sm:h-5"/>}
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4">
+                                          <div className="flex items-center gap-2 sm:gap-3">
+                                            <div className={`p-1 sm:p-1.5 rounded-lg ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                              {t.type === 'purchase' ? <ArrowUpIcon className="w-3 h-3 sm:w-4 sm:h-4"/> : <ArrowDownIcon className="w-3 h-3 sm:w-4 sm:h-4"/>}
                                             </div>
                                             <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
-                                              <p className="font-black text-slate-700 text-sm sm:text-lg">{new Date(t.date).toLocaleDateString()}</p>
-                                              <p className="text-[10px] text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                              <p className="font-black text-slate-700 text-[10px] sm:text-sm">{new Date(t.date).toLocaleDateString()}</p>
+                                              <p className="text-[8px] text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                                             </div>
                                           </div>
                                         </td>
-                                        <td className="px-4 sm:px-6 py-4 sm:py-6">
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4">
                                           {editingTransactionId === t.id ? (
-                                            <input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-20 sm:w-24 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white font-black text-sm sm:text-lg" />
+                                            <input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-16 sm:w-20 px-2 py-1 border-2 rounded-lg bg-white font-black text-xs sm:text-base" />
                                           ) : (
-                                            <span className={`font-black text-lg sm:text-2xl ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'} ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
+                                            <span className={`font-black text-sm sm:text-lg ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'} ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
                                               {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
                                             </span>
                                           )}
                                         </td>
                                         {item.type === 'part' && (
-                                          <td className="px-4 sm:px-6 py-4 sm:py-6">
+                                          <td className="px-2 sm:px-4 py-3 sm:py-4">
                                             {editingTransactionId === t.id ? (
-                                              <input name="modelName" value={transEditData.modelName || ''} onChange={handleTransEditChange} className="w-24 sm:w-32 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white" />
+                                              <input name="modelName" value={transEditData.modelName || ''} onChange={handleTransEditChange} className="w-20 sm:w-24 px-2 py-1 border-2 rounded-lg bg-white text-xs" />
                                             ) : (
-                                              <span className={`font-black text-slate-600 text-sm sm:text-base ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.modelName || '-'}</span>
+                                              <span className={`font-black text-slate-600 text-[10px] sm:text-xs ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.modelName || '-'}</span>
                                             )}
                                           </td>
                                         )}
                                         {item.type === 'product' && (
                                           <>
-                                            <td className="px-4 sm:px-6 py-4 sm:py-6">
+                                            <td className="px-2 sm:px-4 py-3 sm:py-4">
                                               {editingTransactionId === t.id ? (
-                                                <input name="serialNumber" value={transEditData.serialNumber || ''} onChange={handleTransEditChange} className="w-24 sm:w-32 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white font-black uppercase text-xs sm:text-base" />
+                                                <input name="serialNumber" value={transEditData.serialNumber || ''} onChange={handleTransEditChange} className="w-20 sm:w-24 px-2 py-1 border-2 rounded-lg bg-white font-black uppercase text-[10px]" />
                                               ) : (
                                                 <div className="flex flex-col">
                                                   {t.originalSerialNumber && (
-                                                    <span className="text-[10px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1">{t.originalSerialNumber}</span>
+                                                    <span className="text-[8px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1">{t.originalSerialNumber}</span>
                                                   )}
-                                                  <span className={`font-mono font-black text-indigo-600 text-xs sm:text-lg ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.serialNumber || '-'}</span>
+                                                  <span className={`font-mono font-black text-indigo-600 text-[10px] sm:text-sm ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.serialNumber || '-'}</span>
                                                 </div>
                                               )}
                                             </td>
-                                            <td className="px-4 sm:px-6 py-4 sm:py-6">
+                                            <td className="px-2 sm:px-4 py-3 sm:py-4">
                                               {editingTransactionId === t.id ? (
                                                 <div className="space-y-1">
-                                                  <input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
-                                                  <input name="userId" value={transEditData.userId || ''} onChange={handleTransEditChange} placeholder="ID" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
-                                                  <input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
+                                                  <input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
+                                                  <input name="userId" value={transEditData.userId || ''} onChange={handleTransEditChange} placeholder="ID" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
+                                                  <input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
                                                 </div>
                                               ) : (
                                                 <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
-                                                  <div className="flex items-center gap-1.5">
-                                                    <p className="font-black text-slate-800 text-xs sm:text-lg">{t.customerName || '-'}</p>
-                                                    {t.userId && <span className="bg-slate-100 text-slate-500 text-[8px] sm:text-[10px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
+                                                  <div className="flex items-center gap-1">
+                                                    <p className="font-black text-slate-800 text-[10px] sm:text-sm">{t.customerName || '-'}</p>
+                                                    {t.userId && <span className="bg-slate-100 text-slate-500 text-[6px] sm:text-[8px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
                                                   </div>
-                                                  <p className="text-slate-400 font-bold text-[10px] sm:text-sm">{t.phoneNumber || '-'}</p>
+                                                  <p className="text-slate-400 font-bold text-[8px] sm:text-[10px]">{t.phoneNumber || '-'}</p>
                                                 </div>
                                               )}
                                             </td>
-                                            <td className="px-4 sm:px-6 py-4 sm:py-6">
+                                            <td className="px-2 sm:px-4 py-3 sm:py-4">
                                               {editingTransactionId === t.id ? (
-                                                <input name="address" value={transEditData.address || ''} onChange={handleTransEditChange} placeholder="주소" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
+                                                <input name="address" value={transEditData.address || ''} onChange={handleTransEditChange} placeholder="주소" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
                                               ) : (
-                                                <p className={`text-slate-500 font-bold text-[10px] sm:text-sm truncate max-w-[150px] sm:max-w-[200px] ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`} title={t.address}>{t.address || '-'}</p>
+                                                <p className={`text-slate-500 font-bold text-[8px] sm:text-[10px] truncate max-w-[80px] sm:max-w-[120px] ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`} title={t.address}>{t.address || '-'}</p>
                                               )}
                                             </td>
                                           </>
                                         )}
-                                        <td className="px-4 sm:px-6 py-4 sm:py-6">
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4">
                                           {editingTransactionId === t.id ? (
-                                            <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
+                                            <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
                                           ) : (
                                             <div className="flex flex-col">
-                                              {t.isDiscarded && <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">폐기</span>}
-                                              <p className={`text-[10px] sm:text-sm text-slate-400 font-black truncate max-w-[150px] sm:max-w-[250px] ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.remarks || '-'}</p>
+                                              {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest mb-0.5">폐기</span>}
+                                              <p className={`text-[8px] sm:text-[10px] text-slate-400 font-black truncate max-w-[80px] sm:max-w-[150px] ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.remarks || '-'}</p>
                                             </div>
                                           )}
                                         </td>
-                                        <td className="px-4 sm:px-6 py-4 sm:py-6 text-center">
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-center sticky right-0 bg-inherit group-hover:bg-white z-10 border-l-2 border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">
                                           <div className="flex items-center justify-center gap-1 sm:gap-2 transition-opacity">
                                             {editingTransactionId === t.id ? (
                                               <>
