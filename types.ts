@@ -11,6 +11,10 @@ export interface Transaction {
   address?: string; // 주소
   phoneNumber?: string; // 전화번호
   userId?: string; // 아이디 추가
+  returnReason?: string; // 반품 사유
+  isReturned?: boolean; // 반품 여부
+  isDiscarded?: boolean; // 폐기 여부
+  originalSerialNumber?: string; // 이전 일련번호 (수정 시 보관)
 }
 
 export interface Item {

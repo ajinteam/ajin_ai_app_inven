@@ -74,6 +74,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [password, setPassword] = useState('');
   const [editFormData, setEditFormData] = useState<Partial<Item>>({});
   
+  const [showReturnModal, setShowReturnModal] = useState<{ itemId: string, transactionId: string } | null>(null);
+  const [returnReason, setReturnReason] = useState('도장불량');
+  const [returnRemarks, setReturnRemarks] = useState('');
+
   // History Search State
   const [historySearchTerm, setHistorySearchTerm] = useState('');
 
@@ -113,6 +117,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (!term) return [...item.transactions].reverse();
     return [...item.transactions].reverse().filter(t => 
       t.serialNumber?.toLowerCase().includes(term) || 
+      t.originalSerialNumber?.toLowerCase().includes(term) ||
       t.customerName?.toLowerCase().includes(term) ||
       t.remarks?.toLowerCase().includes(term) ||
       t.userId?.toLowerCase().includes(term)
@@ -197,7 +202,33 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
 
   const handleSaveTransEdit = (id: string) => {
+    const originalTrans = item.transactions.find(t => t.id === id);
+    const updatedData = { ...transEditData };
+    
+    // If serial number changed, store the original one
+    if (originalTrans && transEditData.serialNumber && transEditData.serialNumber !== originalTrans.serialNumber) {
+      updatedData.originalSerialNumber = originalTrans.serialNumber;
+    }
+    
     setShowPasswordInput({ type: 'trans_save', targetId: id });
+    setTransEditData(updatedData); // Update with potential originalSerialNumber
+  };
+
+  const handleReturnSubmit = () => {
+    if (showReturnModal) {
+      const reason = returnReason === '기타' ? `기타: ${returnRemarks}` : returnReason;
+      const currentTrans = item.transactions.find(t => t.id === showReturnModal.transactionId);
+      const newRemarks = currentTrans?.remarks ? `${currentTrans.remarks} / 반품: ${reason}` : `반품: ${reason}`;
+      
+      onUpdateTransaction(showReturnModal.itemId, showReturnModal.transactionId, {
+        isReturned: true,
+        returnReason: reason,
+        remarks: newRemarks
+      });
+      setShowReturnModal(null);
+      setReturnRemarks('');
+      alert('반품 보관함으로 이동되었습니다.');
+    }
   };
 
   const handleDeleteTrans = (id: string) => {
@@ -249,9 +280,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <button onClick={onClose} className="p-1 sm:p-3 text-slate-400 hover:text-slate-800 transition-colors ml-1 sm:ml-4"><CloseIcon className="w-8 h-8 sm:w-10 sm:h-10" /></button>
           </div>
         </div>
-        <div className="flex-grow overflow-y-auto p-4 sm:p-10 grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-12">
-          <div className="lg:col-span-1 space-y-6 sm:space-y-8 order-1">
-            <div className="bg-slate-50/80 p-6 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-slate-100">
+        <div className="flex-grow overflow-hidden p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="lg:col-span-1 space-y-4 sm:space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="bg-slate-50/80 p-5 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100">
               {isEditing ? (
                 <div className="space-y-4 sm:space-y-6">
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">품명</label>
@@ -308,7 +339,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
             </div>
             {!isEditing && (
-              <div className="bg-white p-6 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-slate-100 shadow-xl space-y-4 sm:space-y-6 order-2 lg:order-none">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 shadow-xl space-y-4 sm:space-y-5">
                   <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><PlusIcon className="w-4 h-4 sm:w-5 sm:h-5"/> 입출고 기록</h3>
                   <form onSubmit={handleAddTransaction} className="space-y-4 sm:space-y-5">
                       <div className="flex p-1 bg-slate-100 rounded-xl">
@@ -350,8 +381,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
             )}
           </div>
-          <div className="lg:col-span-3 flex flex-col order-3">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+          <div className="lg:col-span-3 flex flex-col overflow-hidden">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-6 w-full">
                 <h3 className="text-sm sm:text-lg font-black text-slate-800 uppercase tracking-widest">수불 히스토리</h3>
                 <div className="relative w-full sm:w-64">
@@ -363,11 +394,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     />
                 </div>
               </div>
-              <button onClick={exportHistoryToExcel} className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-xl text-xs font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-sm">
+              <button onClick={exportHistoryToExcel} className="hidden sm:flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-xl text-xs font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-sm">
                 <DownloadIcon className="w-4 h-4" /><span>내역 내보내기</span></button>
             </div>
-            <div className="flex-grow border-2 border-slate-100 rounded-2xl sm:rounded-[2rem] overflow-hidden bg-slate-50/50 h-[400px] lg:h-auto">
-                <div className="h-full overflow-y-auto scrollbar-hide">
+            <div className="flex-grow border-2 border-slate-100 rounded-2xl sm:rounded-[2rem] overflow-hidden bg-slate-50/50 flex flex-col h-full">
+                <div className="h-full overflow-y-auto custom-scrollbar">
                     {filteredHistory.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full p-10 opacity-20">
                         <BoxIcon className="w-16 h-16 sm:w-24 sm:h-24 mb-4" />
@@ -396,13 +427,13 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                             </thead>
                             <tbody className="divide-y-2 divide-white">
                                 {filteredHistory.map(t => (
-                                    <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''}`}>
+                                    <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''}`}>
                                         <td className="px-4 sm:px-6 py-4 sm:py-6">
                                           <div className="flex items-center gap-3 sm:gap-4">
                                             <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
                                               {t.type === 'purchase' ? <ArrowUpIcon className="w-4 h-4 sm:w-5 sm:h-5"/> : <ArrowDownIcon className="w-4 h-4 sm:w-5 sm:h-5"/>}
                                             </div>
-                                            <div>
+                                            <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
                                               <p className="font-black text-slate-700 text-sm sm:text-lg">{new Date(t.date).toLocaleDateString()}</p>
                                               <p className="text-[10px] text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                                             </div>
@@ -412,7 +443,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                           {editingTransactionId === t.id ? (
                                             <input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-20 sm:w-24 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white font-black text-sm sm:text-lg" />
                                           ) : (
-                                            <span className={`font-black text-lg sm:text-2xl ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            <span className={`font-black text-lg sm:text-2xl ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'} ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
                                               {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
                                             </span>
                                           )}
@@ -422,7 +453,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                             {editingTransactionId === t.id ? (
                                               <input name="modelName" value={transEditData.modelName || ''} onChange={handleTransEditChange} className="w-24 sm:w-32 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white" />
                                             ) : (
-                                              <span className="font-black text-slate-600 text-sm sm:text-base">{t.modelName || '-'}</span>
+                                              <span className={`font-black text-slate-600 text-sm sm:text-base ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.modelName || '-'}</span>
                                             )}
                                           </td>
                                         )}
@@ -432,7 +463,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                               {editingTransactionId === t.id ? (
                                                 <input name="serialNumber" value={transEditData.serialNumber || ''} onChange={handleTransEditChange} className="w-24 sm:w-32 px-2 sm:px-3 py-1.5 sm:py-2 border-2 rounded-lg bg-white font-black uppercase text-xs sm:text-base" />
                                               ) : (
-                                                <span className="font-mono font-black text-indigo-600 text-xs sm:text-lg">{t.serialNumber || '-'}</span>
+                                                <div className="flex flex-col">
+                                                  {t.originalSerialNumber && (
+                                                    <span className="text-[10px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1">{t.originalSerialNumber}</span>
+                                                  )}
+                                                  <span className={`font-mono font-black text-indigo-600 text-xs sm:text-lg ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.serialNumber || '-'}</span>
+                                                </div>
                                               )}
                                             </td>
                                             <td className="px-4 sm:px-6 py-4 sm:py-6">
@@ -443,20 +479,20 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                                   <input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
                                                 </div>
                                               ) : (
-                                                <>
+                                                <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
                                                   <div className="flex items-center gap-1.5">
                                                     <p className="font-black text-slate-800 text-xs sm:text-lg">{t.customerName || '-'}</p>
                                                     {t.userId && <span className="bg-slate-100 text-slate-500 text-[8px] sm:text-[10px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
                                                   </div>
                                                   <p className="text-slate-400 font-bold text-[10px] sm:text-sm">{t.phoneNumber || '-'}</p>
-                                                </>
+                                                </div>
                                               )}
                                             </td>
                                             <td className="px-4 sm:px-6 py-4 sm:py-6">
                                               {editingTransactionId === t.id ? (
                                                 <input name="address" value={transEditData.address || ''} onChange={handleTransEditChange} placeholder="주소" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
                                               ) : (
-                                                <p className="text-slate-500 font-bold text-[10px] sm:text-sm truncate max-w-[150px] sm:max-w-[200px]" title={t.address}>{t.address || '-'}</p>
+                                                <p className={`text-slate-500 font-bold text-[10px] sm:text-sm truncate max-w-[150px] sm:max-w-[200px] ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`} title={t.address}>{t.address || '-'}</p>
                                               )}
                                             </td>
                                           </>
@@ -465,7 +501,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                           {editingTransactionId === t.id ? (
                                             <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-2 py-1.5 border-2 rounded-lg text-xs" />
                                           ) : (
-                                            <p className="text-[10px] sm:text-sm text-slate-400 font-black truncate max-w-[150px] sm:max-w-[250px]">{t.remarks || '-'}</p>
+                                            <div className="flex flex-col">
+                                              {t.isDiscarded && <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">폐기</span>}
+                                              <p className={`text-[10px] sm:text-sm text-slate-400 font-black truncate max-w-[150px] sm:max-w-[250px] ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.remarks || '-'}</p>
+                                            </div>
                                           )}
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 sm:py-6 text-center">
@@ -477,6 +516,25 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                               </>
                                             ) : (
                                               <>
+                                                {t.isDiscarded ? (
+                                                  <button 
+                                                    onClick={() => onUpdateTransaction(item.id, t.id, { isDiscarded: false })}
+                                                    className="px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[10px] font-black hover:bg-emerald-600 hover:text-white transition-all"
+                                                  >
+                                                    복구
+                                                  </button>
+                                                ) : (
+                                                  <>
+                                                    {t.type === 'release' && !t.isReturned && (
+                                                      <button 
+                                                        onClick={() => setShowReturnModal({ itemId: item.id, transactionId: t.id })}
+                                                        className="px-2 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded text-[10px] font-black hover:bg-amber-600 hover:text-white transition-all"
+                                                      >
+                                                        반품
+                                                      </button>
+                                                    )}
+                                                  </>
+                                                )}
                                                 <button onClick={() => handleEditTransaction(t)} className="p-2 text-indigo-400 hover:text-indigo-600 rounded-lg"><EditIcon className="w-4 h-4 sm:w-6 sm:h-6" /></button>
                                                 {/* Only Admin can delete transactions */}
                                                 {authRole === 'admin' && (
@@ -497,6 +555,41 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
         </div>
       </div>
+      {showReturnModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-fade-in-up">
+            <h4 className="text-2xl font-black text-slate-800 mb-6 tracking-tight uppercase">반품 사유 선택</h4>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">사유 목록</label>
+                <select 
+                  value={returnReason} 
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400"
+                >
+                  {['도장불량', '파손', '소비자과실', '부품누락', '인쇄불량', '사출불량', '기타'].map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">상세 내용 (선택)</label>
+                <textarea 
+                  value={returnRemarks} 
+                  onChange={(e) => setReturnRemarks(e.target.value)}
+                  placeholder="추가적인 설명을 입력하세요..."
+                  rows={3}
+                  className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <button onClick={() => setShowReturnModal(null)} className="py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm tracking-widest">취소</button>
+                <button onClick={handleReturnSubmit} className="py-4 bg-amber-500 text-white rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-amber-100">반품 처리</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

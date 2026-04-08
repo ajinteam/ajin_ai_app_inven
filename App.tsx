@@ -25,7 +25,7 @@ const App: React.FC = () => {
   const [authRole, setAuthRole] = useState<'admin' | 'product_only' | 'custom' | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loginPassword, setLoginPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'part' | 'product'>('part');
+  const [activeTab, setActiveTab] = useState<'part' | 'product' | 'return'>('part');
   const [activeProductSubCategory, setActiveProductSubCategory] = useState<'ALL' | 'GiL' | 'KATO' | 'TOMIX'>('ALL');
   
   const [items, setItems] = useState<Item[]>([]);
@@ -286,6 +286,28 @@ const App: React.FC = () => {
 
   const filteredInventory = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
+    
+    if (activeTab === 'return') {
+      const allReturns: { item: Item, transaction: Transaction }[] = [];
+      items.forEach(item => {
+        item.transactions.forEach(t => {
+          if (t.isReturned && !t.isDiscarded) {
+            allReturns.push({ item, transaction: t });
+          }
+        });
+      });
+      
+      return allReturns.filter(({ item, transaction }) => {
+        return item.name.toLowerCase().includes(term) || 
+               item.code.toLowerCase().includes(term) ||
+               transaction.serialNumber?.toLowerCase().includes(term) ||
+               transaction.originalSerialNumber?.toLowerCase().includes(term) ||
+               transaction.customerName?.toLowerCase().includes(term) ||
+               transaction.userId?.toLowerCase().includes(term) ||
+               transaction.returnReason?.toLowerCase().includes(term);
+      });
+    }
+
     return items.filter(item => {
         const matchesTab = (activeTab === 'part' && item.type === 'part') || (activeTab === 'product' && item.type === 'product');
         if (!matchesTab) return false;
@@ -296,6 +318,7 @@ const App: React.FC = () => {
         
         if (activeTab === 'product') return item.transactions.some(t => 
           t.serialNumber?.toLowerCase().includes(term) ||
+          t.originalSerialNumber?.toLowerCase().includes(term) ||
           t.customerName?.toLowerCase().includes(term) ||
           t.userId?.toLowerCase().includes(term)
         );
@@ -402,6 +425,11 @@ const App: React.FC = () => {
                     제품 재고 ({stats.productCount})
                   </button>
                 )}
+                {hasPermission('product', 'read') && (
+                  <button onClick={() => setActiveTab('return')} className={`pb-3 sm:pb-4 px-1 text-sm sm:text-lg font-black uppercase tracking-widest transition-all border-b-4 whitespace-nowrap ${activeTab === 'return' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                    반품 보관 ({items.reduce((acc, item) => acc + item.transactions.filter(t => t.isReturned && !t.isDiscarded).length, 0)})
+                  </button>
+                )}
             </div>
         </div>
       </header>
@@ -466,7 +494,87 @@ const App: React.FC = () => {
 
         <div className="bg-white shadow-xl sm:shadow-2xl border border-slate-100 rounded-2xl sm:rounded-[2.5rem] overflow-hidden relative">
           <div className="overflow-x-auto scrollbar-hide">
-            <table className="w-full text-left min-w-[600px] lg:min-w-0">
+            {activeTab === 'return' ? (
+              <table className="w-full text-left min-w-[800px]">
+                <thead className="text-[10px] sm:text-sm text-slate-400 uppercase bg-slate-50/50 border-b border-slate-100 font-black tracking-widest sm:tracking-[0.2em]">
+                  <tr>
+                    <th className="px-4 sm:px-10 py-4 sm:py-7">제품 정보</th>
+                    <th className="px-4 sm:px-10 py-4 sm:py-7">일련번호</th>
+                    <th className="px-4 sm:px-10 py-4 sm:py-7">반품 사유</th>
+                    <th className="px-4 sm:px-10 py-4 sm:py-7">고객 / ID</th>
+                    <th className="px-4 sm:px-10 py-4 sm:py-7 text-center">관리</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {(filteredInventory as any[]).length === 0 ? (
+                    <tr><td colSpan={5} className="px-10 py-16 sm:py-24 text-center text-slate-300 font-black uppercase tracking-widest italic text-xl sm:text-2xl">반품된 내역이 없습니다</td></tr>
+                  ) : (
+                    (filteredInventory as any[]).map(({ item, transaction }) => (
+                      <tr key={transaction.id} className={`hover:bg-indigo-50/30 transition-colors group ${transaction.isDiscarded ? 'bg-rose-50/30' : ''}`}>
+                        <td className="px-4 sm:px-10 py-4 sm:py-7">
+                          <p className={`font-black text-slate-800 text-sm sm:text-lg ${transaction.isDiscarded ? 'line-through text-rose-400 decoration-rose-500 decoration-2' : ''}`}>{item.name}</p>
+                          <p className="text-[10px] font-mono text-indigo-600 font-bold">{item.code}</p>
+                        </td>
+                        <td className="px-4 sm:px-10 py-4 sm:py-7 font-mono font-black text-indigo-600 text-sm sm:text-lg">
+                          <span className={transaction.isDiscarded ? 'line-through text-rose-400 decoration-rose-500 decoration-2' : ''}>{transaction.serialNumber}</span>
+                        </td>
+                        <td className="px-4 sm:px-10 py-4 sm:py-7">
+                          <span className={`px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-wider border border-amber-100 ${transaction.isDiscarded ? 'opacity-50' : ''}`}>{transaction.returnReason}</span>
+                          {transaction.remarks && <p className="text-[10px] text-slate-400 mt-1 font-bold">{transaction.remarks}</p>}
+                        </td>
+                        <td className="px-4 sm:px-10 py-4 sm:py-7">
+                          <p className={`font-black text-slate-700 text-sm ${transaction.isDiscarded ? 'line-through text-rose-300' : ''}`}>{transaction.customerName || '-'}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">{transaction.userId || '-'}</p>
+                        </td>
+                        <td className="px-4 sm:px-10 py-4 sm:py-7">
+                          <div className="flex justify-center gap-2">
+                            {transaction.isDiscarded ? (
+                              <button 
+                                onClick={() => handleUpdateTransaction(item.id, transaction.id, { isDiscarded: false })}
+                                className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg font-black text-[10px] uppercase border border-emerald-100 hover:bg-emerald-600 hover:text-white"
+                              >
+                                복구
+                              </button>
+                            ) : (
+                              <>
+                                <button 
+                                  onClick={() => {
+                                    const now = new Date();
+                                    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                                    const newRemarks = transaction.remarks ? `${transaction.remarks} / 폐기(${dateStr})` : `폐기(${dateStr})`;
+                                    handleUpdateTransaction(item.id, transaction.id, { isDiscarded: true, remarks: newRemarks });
+                                  }}
+                                  className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg font-black text-[10px] uppercase border border-rose-100 hover:bg-rose-600 hover:text-white"
+                                >
+                                  폐기
+                                </button>
+                                <button 
+                                  onClick={() => handleUpdateTransaction(item.id, transaction.id, { isReturned: false, returnReason: undefined })}
+                                  className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg font-black text-[10px] uppercase border border-indigo-100 hover:bg-indigo-600 hover:text-white"
+                                >
+                                  원복
+                                </button>
+                              </>
+                            )}
+                            <button 
+                              onClick={() => {
+                                if (confirm('반품 내역을 삭제하시겠습니까? 삭제 시 해당 출고 내역이 완전히 제거되어 재고 수량이 복구됩니다.')) {
+                                  handleDeleteTransaction(item.id, transaction.id);
+                                }
+                              }}
+                              className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                            >
+                              <TrashIcon className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full text-left min-w-[600px] lg:min-w-0">
               <thead className="text-[10px] sm:text-sm text-slate-400 uppercase bg-slate-50/50 border-b border-slate-100 font-black tracking-widest sm:tracking-[0.2em]">
                 <tr>
                   <th className="px-4 sm:px-10 py-4 sm:py-7">품목 코드</th>
@@ -516,6 +624,7 @@ const App: React.FC = () => {
                 )}
               </tbody>
             </table>
+            )}
           </div>
         </div>
       </main>
