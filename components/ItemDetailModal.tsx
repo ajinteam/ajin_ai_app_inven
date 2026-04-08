@@ -281,8 +281,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
         </div>
         <div className="flex-grow overflow-hidden p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
-          <div className="lg:col-span-1 space-y-4 sm:space-y-6 overflow-y-auto pr-2 custom-scrollbar">
-            <div className="bg-slate-50/80 p-5 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100">
+          {!historySearchTerm && (
+            <div className="lg:col-span-1 space-y-4 sm:space-y-6 overflow-y-auto pr-2 custom-scrollbar animate-fade-in">
+              <div className="bg-slate-50/80 p-5 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100">
               {isEditing ? (
                 <div className="space-y-4 sm:space-y-6">
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">품명</label>
@@ -380,8 +381,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   </form>
               </div>
             )}
-          </div>
-          <div className="lg:col-span-3 flex flex-col overflow-hidden">
+            </div>
+          )}
+          <div className={`${historySearchTerm ? 'lg:col-span-4' : 'lg:col-span-3'} flex flex-col overflow-hidden transition-all duration-300`}>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-6 w-full">
                 <h3 className="text-sm sm:text-lg font-black text-slate-800 uppercase tracking-widest">수불 히스토리</h3>
@@ -508,7 +510,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                           )}
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 sm:py-6 text-center">
-                                          <div className="flex items-center justify-center gap-1 sm:gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <div className="flex items-center justify-center gap-1 sm:gap-2 transition-opacity">
                                             {editingTransactionId === t.id ? (
                                               <>
                                                 <button onClick={() => handleSaveTransEdit(t.id)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"><CheckIcon className="w-5 h-5" /></button>
