@@ -126,13 +126,23 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     
     if (exactMatches.length > 0) return exactMatches;
     
-    return allTrans.filter(t => 
-      t.serialNumber?.toLowerCase().includes(term) || 
-      t.originalSerialNumber?.toLowerCase().includes(term) ||
-      t.customerName?.toLowerCase().includes(term) ||
-      t.remarks?.toLowerCase().includes(term) ||
-      t.userId?.toLowerCase().includes(term)
-    );
+    // If the term looks like a serial number (e.g. starts with letters and has numbers, or just long enough), 
+    // we might want to be stricter. But the user said "match only the number".
+    // If we are here, it means no exact match was found.
+    // If the user is searching for a serial number, they probably don't want partial matches of other serials.
+    
+    return allTrans.filter(t => {
+      // If it's a serial number field, we only allow exact match (which we already checked above and failed)
+      // So we effectively disable partial matching for serial numbers if we want to be strict.
+      // However, we still want partial matching for customer name, remarks, etc.
+      
+      const serialMatch = t.serialNumber?.toLowerCase() === term || t.originalSerialNumber?.toLowerCase() === term;
+      const otherMatch = t.customerName?.toLowerCase().includes(term) || 
+                         t.remarks?.toLowerCase().includes(term) ||
+                         t.userId?.toLowerCase().includes(term);
+      
+      return serialMatch || otherMatch;
+    });
   }, [item.transactions, historySearchTerm]);
 
   const handleAddTransaction = (e: React.FormEvent) => {
@@ -341,7 +351,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </>
                     )}
                     <div className="flex justify-between pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Reg Date</span><span className="font-bold text-slate-500">{item.registrationDate}</span></div>
-                    {item.remarks && (<div className="mt-4 p-4 bg-white rounded-xl border border-slate-100 text-slate-600 font-bold leading-relaxed italic text-sm">"{item.remarks}"</div>)}
+                    {item.remarks && (<div className="mt-4 p-4 bg-white rounded-xl border border-slate-100 text-slate-600 font-bold leading-relaxed italic text-sm whitespace-pre-wrap break-all">"{item.remarks}"</div>)}
                   </div>
                 </>
               )}
@@ -510,16 +520,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                             </td>
                                           </>
                                         )}
-                                        <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                          {editingTransactionId === t.id ? (
-                                            <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
-                                          ) : (
-                                            <div className="flex flex-col">
-                                              {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest mb-0.5">폐기</span>}
-                                              <p className={`text-[8px] sm:text-[10px] text-slate-400 font-black truncate max-w-[80px] sm:max-w-[150px] ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.remarks || '-'}</p>
-                                            </div>
-                                          )}
-                                        </td>
+                                          <td className="px-2 sm:px-4 py-3 sm:py-4">
+                                            {editingTransactionId === t.id ? (
+                                              <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
+                                            ) : (
+                                              <div className="flex flex-col">
+                                                {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest mb-0.5">폐기</span>}
+                                                <p className={`text-[8px] sm:text-[10px] text-slate-400 font-black whitespace-pre-wrap break-all ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.remarks || '-'}</p>
+                                              </div>
+                                            )}
+                                          </td>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4 text-center sticky right-0 bg-inherit group-hover:bg-white z-10 border-l-2 border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">
                                           <div className="flex items-center justify-center gap-1 sm:gap-2 transition-opacity">
                                             {editingTransactionId === t.id ? (

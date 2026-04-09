@@ -317,10 +317,12 @@ const App: React.FC = () => {
         if (basicMatch) return true;
         
         if (activeTab === 'product') return item.transactions.some(t => 
-          t.serialNumber?.toLowerCase().includes(term) ||
-          t.originalSerialNumber?.toLowerCase().includes(term) ||
-          t.customerName?.toLowerCase().includes(term) ||
-          t.userId?.toLowerCase().includes(term)
+          !t.isReturned && (
+            t.serialNumber?.toLowerCase().includes(term) ||
+            t.originalSerialNumber?.toLowerCase().includes(term) ||
+            t.customerName?.toLowerCase().includes(term) ||
+            t.userId?.toLowerCase().includes(term)
+          )
         );
         return false;
     });
@@ -520,7 +522,7 @@ const App: React.FC = () => {
                         </td>
                         <td className="px-4 sm:px-10 py-4 sm:py-7">
                           <span className={`px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-wider border border-amber-100 ${transaction.isDiscarded ? 'opacity-50' : ''}`}>{transaction.returnReason}</span>
-                          {transaction.remarks && <p className="text-[10px] text-slate-400 mt-1 font-bold">{transaction.remarks}</p>}
+                          {transaction.remarks && <p className="text-[10px] text-slate-400 mt-1 font-bold whitespace-pre-wrap break-all">{transaction.remarks}</p>}
                         </td>
                         <td className="px-4 sm:px-10 py-4 sm:py-7">
                           <p className={`font-black text-slate-700 text-sm ${transaction.isDiscarded ? 'line-through text-rose-300' : ''}`}>{transaction.customerName || '-'}</p>
