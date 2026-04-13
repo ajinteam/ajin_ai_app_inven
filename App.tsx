@@ -17,6 +17,8 @@ const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Mat
 
 const calculateStock = (item: Item): number => {
   return item.transactions.reduce((acc, t) => {
+    // 반품 보관 상태(isReturned=true)이고 폐기되지 않은(isDiscarded=false) 항목은 재고 계산에서 제외
+    if (t.isReturned && !t.isDiscarded) return acc;
     return t.type === 'purchase' ? acc + t.quantity : acc - t.quantity;
   }, 0);
 };
@@ -55,12 +57,31 @@ const App: React.FC = () => {
       
       const data = await response.json();
       if (data && Array.isArray(data.items)) {
-        setItems(data.items);
+        // item.id 및 transaction.id 기준 중복 제거 로직 추가
+        const uniqueItemsMap = new Map<string, Item>();
+        
+        data.items.forEach((item: Item) => {
+          if (!uniqueItemsMap.has(item.id)) {
+            // 트랜잭션 중복 제거
+            const uniqueTransactionsMap = new Map<string, Transaction>();
+            item.transactions.forEach((t: Transaction) => {
+              if (!uniqueTransactionsMap.has(t.id)) {
+                uniqueTransactionsMap.set(t.id, t);
+              }
+            });
+            item.transactions = Array.from(uniqueTransactionsMap.values());
+            uniqueItemsMap.set(item.id, item);
+          }
+        });
+
+        const dedupedItems = Array.from(uniqueItemsMap.values());
+        setItems(dedupedItems);
+        
         if (data.users) setUsers(data.users);
         setDataSource('cloud');
         setSyncStatus('success');
         setLastSyncedAt(new Date());
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.items));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dedupedItems));
         if (data.users) localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(data.users));
         return true;
       }
@@ -285,60 +306,53 @@ const App: React.FC = () => {
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId), [items, selectedItemId]);
 
   const filteredInventory = useMemo(() => {
-  const term = searchTerm.toLowerCase().trim();
-  
-  // [1] 반품 보관 탭일 때
-  if (activeTab === 'return') {
-    const allReturns: { item: Item, transaction: Transaction }[] = [];
+    const term = searchTerm.toLowerCase().trim();
     
-    items.forEach(item => {
-      item.transactions.forEach(t => {
-        // 반품되었고 아직 폐기되지 않은 것만 추출
-        if (t.isReturned && !t.isDiscarded) {
-          const matchesSearch = 
-            item.name.toLowerCase().includes(term) || 
-            item.code.toLowerCase().includes(term) ||
-            t.serialNumber?.toLowerCase().includes(term) ||
-            t.customerName?.toLowerCase().includes(term) ||
-            t.returnReason?.toLowerCase().includes(term);
+    if (activeTab === 'return') {
+      const allReturns: { item: Item, transaction: Transaction }[] = [];
+      const seenTransactionIds = new Set<string>();
 
-          if (!term || matchesSearch) {
-            allReturns.push({ item, transaction: t });
+      items.forEach(item => {
+        item.transactions.forEach(t => {
+          if (t.isReturned && !t.isDiscarded) {
+            if (!seenTransactionIds.has(t.id)) {
+              allReturns.push({ item, transaction: t });
+              seenTransactionIds.add(t.id);
+            }
           }
-        }
+        });
       });
+      
+      return allReturns.filter(({ item, transaction }) => {
+        return item.name.toLowerCase().includes(term) || 
+               item.code.toLowerCase().includes(term) ||
+               transaction.serialNumber?.toLowerCase().includes(term) ||
+               transaction.originalSerialNumber?.toLowerCase().includes(term) ||
+               transaction.customerName?.toLowerCase().includes(term) ||
+               transaction.userId?.toLowerCase().includes(term) ||
+               transaction.returnReason?.toLowerCase().includes(term);
+      });
+    }
+
+    return items.filter(item => {
+        const matchesTab = (activeTab === 'part' && item.type === 'part') || (activeTab === 'product' && item.type === 'product');
+        if (!matchesTab) return false;
+        if (activeTab === 'product' && activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) return false;
+
+        const basicMatch = item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term);
+        if (basicMatch) return true;
+        
+        if (activeTab === 'product') return item.transactions.some(t => 
+          !t.isReturned && (
+            t.serialNumber?.toLowerCase().includes(term) ||
+            t.originalSerialNumber?.toLowerCase().includes(term) ||
+            t.customerName?.toLowerCase().includes(term) ||
+            t.userId?.toLowerCase().includes(term)
+          )
+        );
+        return false;
     });
-    // 여기서 생성된 allReturns는 탭을 이동해도 items가 변하지 않는 한 일정하게 유지됩니다.
-    return allReturns;
-  }
-
-  // [2] 부품 또는 제품 재고 탭일 때
-  return items.filter(item => {
-    const isCorrectTab = (activeTab === 'part' && item.type === 'part') || 
-                         (activeTab === 'product' && item.type === 'product');
-    if (!isCorrectTab) return false;
-
-    // 카테고리 필터 (GiL, KATO 등)
-    if (activeTab === 'product' && activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) {
-      return false;
-    }
-
-    const basicMatch = item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term);
-    
-    // 제품 탭 검색 시: '반품된 것'은 일반 재고 리스트에서 절대 나오지 않게 차단 (!t.isReturned)
-    if (activeTab === 'product') {
-      const transactionMatch = item.transactions.some(t => 
-        !t.isReturned && (
-          t.serialNumber?.toLowerCase().includes(term) ||
-          t.customerName?.toLowerCase().includes(term)
-        )
-      );
-      return basicMatch || transactionMatch;
-    }
-
-    return basicMatch;
-  });
-}, [items, searchTerm, activeTab, activeProductSubCategory]);
+  }, [items, searchTerm, activeTab, activeProductSubCategory]);
 
   const exportToExcel = () => {
     let csvContent = "\ufeff";

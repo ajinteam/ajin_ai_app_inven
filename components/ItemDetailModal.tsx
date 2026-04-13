@@ -107,7 +107,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     }
   }, [serialNumber, item.type]);
 
-  const currentStock = useMemo(() => item.transactions.reduce((acc, t) => t.type === 'purchase' ? acc + t.quantity : acc - t.quantity, 0), [item.transactions]);
+  const currentStock = useMemo(() => item.transactions.reduce((acc, t) => {
+    if (t.isReturned && !t.isDiscarded) return acc;
+    return t.type === 'purchase' ? acc + t.quantity : acc - t.quantity;
+  }, 0), [item.transactions]);
   const isSerialDuplicate = useMemo(() => (!serialNumber.trim() || serialNumber.includes('~')) ? false : allUsedSerials.includes(serialNumber.toUpperCase()), [serialNumber, allUsedSerials]);
   const isCodeDuplicate = useMemo(() => (!editFormData.code || editFormData.code === item.code) ? false : existingCodes.some(c => c.toUpperCase() === editFormData.code?.toUpperCase()), [editFormData.code, existingCodes, item.code]);
 
