@@ -19,6 +19,9 @@ async function startServer() {
   // API Routes
   app.get('/api/inventory', async (req, res) => {
     try {
+      if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+        throw new Error('KV environment variables are not configured. Please set KV_REST_API_URL and KV_REST_API_TOKEN in the Settings menu.');
+      }
       const data = await kv.get(KEY);
       res.json(data || { items: [], lastUpdated: null });
     } catch (error: any) {
@@ -29,6 +32,9 @@ async function startServer() {
 
   app.post('/api/inventory', async (req, res) => {
     try {
+      if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+        throw new Error('KV environment variables are not configured. Please set KV_REST_API_URL and KV_REST_API_TOKEN in the Settings menu.');
+      }
       const body = req.body;
       if (!body || !Array.isArray(body.items)) {
         return res.status(400).json({ error: 'Invalid data format' });
