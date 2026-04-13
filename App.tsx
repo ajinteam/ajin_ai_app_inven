@@ -285,62 +285,61 @@ const App: React.FC = () => {
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId), [items, selectedItemId]);
 
   const filteredInventory = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
+  const term = searchTerm.toLowerCase().trim();
+  
+  // [1] 반품 보관 탭일 때
+  if (activeTab === 'return') {
+    const allReturns: { item: Item, transaction: Transaction }[] = [];
     
-    // 1. 반품 보관 탭 로직 수정
-    if (activeTab === 'return') {
-      const allReturns: { item: Item, transaction: Transaction }[] = [];
-      
-      items.forEach(item => {
-        item.transactions.forEach(t => {
-          // 폐기되지 않은 반품 내역만 추출
-          if (t.isReturned && !t.isDiscarded) {
-            // 검색어가 있을 경우 필터링 로직 포함
-            const matchesSearch = 
-              item.name.toLowerCase().includes(term) || 
-              item.code.toLowerCase().includes(term) ||
-              t.serialNumber?.toLowerCase().includes(term) ||
-              t.customerName?.toLowerCase().includes(term) ||
-              t.userId?.toLowerCase().includes(term) ||
-              t.returnReason?.toLowerCase().includes(term);
+    items.forEach(item => {
+      item.transactions.forEach(t => {
+        // 반품되었고 아직 폐기되지 않은 것만 추출
+        if (t.isReturned && !t.isDiscarded) {
+          const matchesSearch = 
+            item.name.toLowerCase().includes(term) || 
+            item.code.toLowerCase().includes(term) ||
+            t.serialNumber?.toLowerCase().includes(term) ||
+            t.customerName?.toLowerCase().includes(term) ||
+            t.returnReason?.toLowerCase().includes(term);
 
-            if (!term || matchesSearch) {
-              allReturns.push({ item, transaction: t });
-            }
+          if (!term || matchesSearch) {
+            allReturns.push({ item, transaction: t });
           }
-        });
+        }
       });
-      return allReturns;
+    });
+    // 여기서 생성된 allReturns는 탭을 이동해도 items가 변하지 않는 한 일정하게 유지됩니다.
+    return allReturns;
+  }
+
+  // [2] 부품 또는 제품 재고 탭일 때
+  return items.filter(item => {
+    const isCorrectTab = (activeTab === 'part' && item.type === 'part') || 
+                         (activeTab === 'product' && item.type === 'product');
+    if (!isCorrectTab) return false;
+
+    // 카테고리 필터 (GiL, KATO 등)
+    if (activeTab === 'product' && activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) {
+      return false;
     }
 
-    // 2. 부품 및 제품 재고 탭 로직 수정
-    return items.filter(item => {
-        const matchesTab = (activeTab === 'part' && item.type === 'part') || (activeTab === 'product' && item.type === 'product');
-        if (!matchesTab) return false;
-        
-        // 제품 탭일 경우 서브 카테고리 필터링
-        if (activeTab === 'product' && activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) return false;
+    const basicMatch = item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term);
+    
+    // 제품 탭 검색 시: '반품된 것'은 일반 재고 리스트에서 절대 나오지 않게 차단 (!t.isReturned)
+    if (activeTab === 'product') {
+      const transactionMatch = item.transactions.some(t => 
+        !t.isReturned && (
+          t.serialNumber?.toLowerCase().includes(term) ||
+          t.customerName?.toLowerCase().includes(term)
+        )
+      );
+      return basicMatch || transactionMatch;
+    }
 
-        // 핵심 수정: 기본 정보 매칭 (이름, 코드)
-        const basicMatch = item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term);
-        
-        // 제품 탭일 경우 일련번호/고객명으로 검색 가능하게 하되, 
-        // '반품된 내역(isReturned)'은 일반 재고 리스트에서 제외함
-        if (activeTab === 'product') {
-          const transactionMatch = item.transactions.some(t => 
-            !t.isReturned && ( // 반품되지 않은 정상 출고 건에서만 검색
-              t.serialNumber?.toLowerCase().includes(term) ||
-              t.customerName?.toLowerCase().includes(term) ||
-              t.userId?.toLowerCase().includes(term)
-            )
-          );
-          return basicMatch || transactionMatch;
-        }
+    return basicMatch;
+  });
+}, [items, searchTerm, activeTab, activeProductSubCategory]);
 
-        return basicMatch;
-    });
-  }, [items, searchTerm, activeTab, activeProductSubCategory]);
-  
   const exportToExcel = () => {
     let csvContent = "\ufeff";
     let headers: string[] = [];
