@@ -17,6 +17,8 @@ const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Mat
 
 const calculateStock = (item: Item): number => {
   return item.transactions.reduce((acc, t) => {
+    // 반품 보관 상태(isReturned=true)이고 폐기되지 않은(isDiscarded=false) 항목은 재고 계산에서 제외
+    if (t.isReturned && !t.isDiscarded) return acc;
     return t.type === 'purchase' ? acc + t.quantity : acc - t.quantity;
   }, 0);
 };
@@ -55,12 +57,31 @@ const App: React.FC = () => {
       
       const data = await response.json();
       if (data && Array.isArray(data.items)) {
-        setItems(data.items);
+        // item.id 및 transaction.id 기준 중복 제거 로직 추가
+        const uniqueItemsMap = new Map<string, Item>();
+        
+        data.items.forEach((item: Item) => {
+          if (!uniqueItemsMap.has(item.id)) {
+            // 트랜잭션 중복 제거
+            const uniqueTransactionsMap = new Map<string, Transaction>();
+            item.transactions.forEach((t: Transaction) => {
+              if (!uniqueTransactionsMap.has(t.id)) {
+                uniqueTransactionsMap.set(t.id, t);
+              }
+            });
+            item.transactions = Array.from(uniqueTransactionsMap.values());
+            uniqueItemsMap.set(item.id, item);
+          }
+        });
+
+        const dedupedItems = Array.from(uniqueItemsMap.values());
+        setItems(dedupedItems);
+        
         if (data.users) setUsers(data.users);
         setDataSource('cloud');
         setSyncStatus('success');
         setLastSyncedAt(new Date());
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.items));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dedupedItems));
         if (data.users) localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(data.users));
         return true;
       }
@@ -289,10 +310,15 @@ const App: React.FC = () => {
     
     if (activeTab === 'return') {
       const allReturns: { item: Item, transaction: Transaction }[] = [];
+      const seenTransactionIds = new Set<string>();
+
       items.forEach(item => {
         item.transactions.forEach(t => {
           if (t.isReturned && !t.isDiscarded) {
-            allReturns.push({ item, transaction: t });
+            if (!seenTransactionIds.has(t.id)) {
+              allReturns.push({ item, transaction: t });
+              seenTransactionIds.add(t.id);
+            }
           }
         });
       });
