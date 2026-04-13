@@ -287,47 +287,60 @@ const App: React.FC = () => {
   const filteredInventory = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     
+    // 1. 반품 보관 탭 로직 수정
     if (activeTab === 'return') {
       const allReturns: { item: Item, transaction: Transaction }[] = [];
+      
       items.forEach(item => {
         item.transactions.forEach(t => {
+          // 폐기되지 않은 반품 내역만 추출
           if (t.isReturned && !t.isDiscarded) {
-            allReturns.push({ item, transaction: t });
+            // 검색어가 있을 경우 필터링 로직 포함
+            const matchesSearch = 
+              item.name.toLowerCase().includes(term) || 
+              item.code.toLowerCase().includes(term) ||
+              t.serialNumber?.toLowerCase().includes(term) ||
+              t.customerName?.toLowerCase().includes(term) ||
+              t.userId?.toLowerCase().includes(term) ||
+              t.returnReason?.toLowerCase().includes(term);
+
+            if (!term || matchesSearch) {
+              allReturns.push({ item, transaction: t });
+            }
           }
         });
       });
-      
-      return allReturns.filter(({ item, transaction }) => {
-        return item.name.toLowerCase().includes(term) || 
-               item.code.toLowerCase().includes(term) ||
-               transaction.serialNumber?.toLowerCase().includes(term) ||
-               transaction.originalSerialNumber?.toLowerCase().includes(term) ||
-               transaction.customerName?.toLowerCase().includes(term) ||
-               transaction.userId?.toLowerCase().includes(term) ||
-               transaction.returnReason?.toLowerCase().includes(term);
-      });
+      return allReturns;
     }
 
+    // 2. 부품 및 제품 재고 탭 로직 수정
     return items.filter(item => {
         const matchesTab = (activeTab === 'part' && item.type === 'part') || (activeTab === 'product' && item.type === 'product');
         if (!matchesTab) return false;
+        
+        // 제품 탭일 경우 서브 카테고리 필터링
         if (activeTab === 'product' && activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) return false;
 
+        // 핵심 수정: 기본 정보 매칭 (이름, 코드)
         const basicMatch = item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term);
-        if (basicMatch) return true;
         
-        if (activeTab === 'product') return item.transactions.some(t => 
-          !t.isReturned && (
-            t.serialNumber?.toLowerCase().includes(term) ||
-            t.originalSerialNumber?.toLowerCase().includes(term) ||
-            t.customerName?.toLowerCase().includes(term) ||
-            t.userId?.toLowerCase().includes(term)
-          )
-        );
-        return false;
+        // 제품 탭일 경우 일련번호/고객명으로 검색 가능하게 하되, 
+        // '반품된 내역(isReturned)'은 일반 재고 리스트에서 제외함
+        if (activeTab === 'product') {
+          const transactionMatch = item.transactions.some(t => 
+            !t.isReturned && ( // 반품되지 않은 정상 출고 건에서만 검색
+              t.serialNumber?.toLowerCase().includes(term) ||
+              t.customerName?.toLowerCase().includes(term) ||
+              t.userId?.toLowerCase().includes(term)
+            )
+          );
+          return basicMatch || transactionMatch;
+        }
+
+        return basicMatch;
     });
   }, [items, searchTerm, activeTab, activeProductSubCategory]);
-
+  
   const exportToExcel = () => {
     let csvContent = "\ufeff";
     let headers: string[] = [];
