@@ -313,13 +313,18 @@ const App: React.FC = () => {
         if (!matchesTab) return false;
         if (activeTab === 'product' && activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) return false;
 
+        // Exclude items that only have returned transactions from main inventory
+        const hasNonReturned = item.transactions.length === 0 || item.transactions.some(t => !t.isReturned);
+        if (!hasNonReturned) return false;
+
         const basicMatch = item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term);
+        if (term === '') return true;
         if (basicMatch) return true;
         
         if (activeTab === 'product') return item.transactions.some(t => 
           !t.isReturned && (
-            t.serialNumber?.toLowerCase().includes(term) ||
-            t.originalSerialNumber?.toLowerCase().includes(term) ||
+            t.serialNumber?.toLowerCase() === term ||
+            t.originalSerialNumber?.toLowerCase() === term ||
             t.customerName?.toLowerCase().includes(term) ||
             t.userId?.toLowerCase().includes(term)
           )
