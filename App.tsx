@@ -330,19 +330,43 @@ const App: React.FC = () => {
 
   const exportToExcel = () => {
     let csvContent = "\ufeff";
-    const headers = activeTab === 'part' ? ['코드', '품명', '도번', '현재재고'] : ['카테고리', '코드', '제품명', '현재재고'];
-    csvContent += headers.join(',') + '\r\n';
-    filteredInventory.forEach(item => {
-      const row = activeTab === 'part' 
-        ? [item.code, item.name, item.drawingNumber, calculateStock(item)]
-        : [item.category || '-', item.code, item.name, calculateStock(item)];
-      csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\r\n';
-    });
+    let headers: string[] = [];
+    let filename = "";
+
+    if (activeTab === 'return') {
+      headers = ['제품명', '품번', '일련번호', '반품사유', '고객명', '아이디', '비고'];
+      filename = `반품_보관_${new Date().toISOString().split('T')[0]}.csv`;
+      csvContent += headers.join(',') + '\r\n';
+      (filteredInventory as any[]).forEach(({ item, transaction }) => {
+        const row = [
+          item.name,
+          item.code,
+          transaction.serialNumber || '-',
+          transaction.returnReason || '-',
+          transaction.customerName || '-',
+          transaction.userId || '-',
+          transaction.remarks || '-'
+        ];
+        csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\r\n';
+      });
+    } else {
+      headers = activeTab === 'part' ? ['코드', '품명', '도번', '현재재고'] : ['카테고리', '코드', '제품명', '현재재고'];
+      filename = `${activeTab === 'part' ? '부품' : '제품'}_재고_${new Date().toISOString().split('T')[0]}.csv`;
+      csvContent += headers.join(',') + '\r\n';
+      (filteredInventory as Item[]).forEach(item => {
+        const row = activeTab === 'part' 
+          ? [item.code, item.name, item.drawingNumber, calculateStock(item)]
+          : [item.category || '-', item.code, item.name, calculateStock(item)];
+        csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\r\n';
+      });
+    }
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `${activeTab === 'part' ? '부품' : '제품'}_재고_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = filename;
     link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   if (!authRole) {
