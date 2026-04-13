@@ -96,7 +96,6 @@ const App: React.FC = () => {
   };
 
   const saveToCloud = async (data: Item[], userData: User[]) => {
-    if (data.length === 0 && !isInitialLoad.current) return false;
     setSyncStatus('loading');
     try {
       const response = await fetch('/api/inventory', {
@@ -109,31 +108,18 @@ const App: React.FC = () => {
         })
       });
 
-      const result = await response.json();
-
       if (response.ok) {
         setSyncStatus('success');
         setLastSyncedAt(new Date());
         setDataSource('cloud');
-        return true;
       } else {
-        throw new Error(result.details || result.error || 'Save failed');
+        throw new Error('Save failed');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Cloud Save Error:', err);
       setSyncStatus('error');
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(userData));
-      return false;
-    }
-  };
-
-  const handleManualSync = async () => {
-    const success = await saveToCloud(items, users);
-    if (success) {
-      alert('클라우드 동기화가 완료되었습니다.');
-    } else {
-      alert('동기화에 실패했습니다. 환경 변수 설정을 확인해주세요.');
     }
   };
 
@@ -475,10 +461,6 @@ const App: React.FC = () => {
                         사용자 및 권한 관리
                       </button>
                     )}
-                    <button onClick={handleManualSync} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-[9px] font-black uppercase tracking-widest shadow-sm">
-                        <CloudIcon className="w-3 h-3" />
-                        <span className="hidden sm:inline">클라우드 지금 저장</span>
-                    </button>
                     <button onClick={handleLocalExport} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 text-[9px] font-black uppercase tracking-widest shadow-sm">
                         <DownloadIcon className="w-3 h-3" />
                         <span className="hidden sm:inline">백업 저장</span>

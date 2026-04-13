@@ -39,9 +39,6 @@ async function startServer() {
       if (!body || !Array.isArray(body.items)) {
         return res.status(400).json({ error: 'Invalid data format' });
       }
-      
-      console.log(`[KV SAVE] Items: ${body.items.length}, Users: ${body.users?.length || 0}, Size: ${Math.round(JSON.stringify(body).length / 1024)} KB`);
-      
       await kv.set(KEY, body);
       res.json({ success: true, timestamp: new Date().toISOString() });
     } catch (error: any) {
