@@ -18,17 +18,15 @@ async function startServer() {
 
   // API Routes
   app.get('/api/inventory', async (req, res) => {
-    try {
-      if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-        throw new Error('KV environment variables are not configured. Please set KV_REST_API_URL and KV_REST_API_TOKEN in the Settings menu.');
-      }
-      const data = await kv.get(KEY);
-      res.json(data || { items: [], lastUpdated: null });
-    } catch (error: any) {
-      console.error('KV GET Error:', error);
-      res.status(500).json({ error: 'Internal Server Error', details: error.message });
-    }
-  });
+  try {
+    // ... 환경변수 체크 생략 ...
+    const data = await kv.get(KEY);
+    // 기본값에 users: [] 를 반드시 추가하세요
+    res.json(data || { items: [], users: [], lastUpdated: null }); 
+  } catch (error: any) {
+    // ...
+  }
+});
 
   app.post('/api/inventory', async (req, res) => {
     try {

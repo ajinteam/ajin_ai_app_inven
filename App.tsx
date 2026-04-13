@@ -129,15 +129,25 @@ const App: React.FC = () => {
     });
   }, []);
 
-  useEffect(() => {
-    if (isInitialLoad.current) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-    const timer = setTimeout(() => {
+ useEffect(() => {
+  // 초기 로드 중에는 클라우드에 빈 값을 저장하지 않음
+  if (isInitialLoad.current) return;
+
+  // 로컬 저장
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+
+  const timer = setTimeout(() => {
+    // [중요] 데이터가 유실되지 않도록 최소한의 방어막 구축
+    // 불러온 데이터가 아예 없을 때(items.length === 0) 
+    // 실수로 빈 배열을 Upstash에 보내는 것을 방지
+    if (items.length > 0) {
       saveToCloud(items, users);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [items, users]);
+    }
+  }, 2000); 
+
+  return () => clearTimeout(timer);
+}, [items, users]);
 
   const returnCount = useMemo(() => {
     const seenIds = new Set<string>();
