@@ -17,8 +17,6 @@ const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Mat
 
 const calculateStock = (item: Item): number => {
   return item.transactions.reduce((acc, t) => {
-    // 반품 보관 상태(isReturned=true)이고 폐기되지 않은(isDiscarded=false) 항목은 재고 계산에서 제외
-    if (t.isReturned && !t.isDiscarded) return acc;
     return t.type === 'purchase' ? acc + t.quantity : acc - t.quantity;
   }, 0);
 };
@@ -140,6 +138,20 @@ const App: React.FC = () => {
     }, 1500);
     return () => clearTimeout(timer);
   }, [items, users]);
+
+  const returnCount = useMemo(() => {
+    const seenIds = new Set<string>();
+    let count = 0;
+    items.forEach(item => {
+      item.transactions.forEach(t => {
+        if (t.isReturned && !t.isDiscarded && !seenIds.has(t.id)) {
+          count++;
+          seenIds.add(t.id);
+        }
+      });
+    });
+    return count;
+  }, [items]);
 
   const stats = useMemo(() => {
     return {
@@ -479,7 +491,7 @@ const App: React.FC = () => {
                 )}
                 {hasPermission('product', 'read') && (
                   <button onClick={() => setActiveTab('return')} className={`pb-3 sm:pb-4 px-1 text-sm sm:text-lg font-black uppercase tracking-widest transition-all border-b-4 whitespace-nowrap ${activeTab === 'return' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                    반품 보관 ({items.reduce((acc, item) => acc + item.transactions.filter(t => t.isReturned && !t.isDiscarded).length, 0)})
+                    반품 보관 ({returnCount})
                   </button>
                 )}
             </div>
