@@ -17,7 +17,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose }) =
     const releases: (Transaction & { itemName: string, itemBrand: string })[] = [];
     items.forEach(item => {
       item.transactions.forEach(t => {
-        if (t.type === 'release' && !t.isReturned) {
+        if (t.type === 'release') {
           releases.push({
             ...t,
             itemName: item.name,
