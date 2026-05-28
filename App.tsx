@@ -44,6 +44,7 @@ const App: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline'>('loading');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [dataSource, setDataSource] = useState<'cloud' | 'local'>('local');
+  const [encryptionEnabled, setEncryptionEnabled] = useState<boolean>(false);
   const isInitialLoad = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,6 +77,9 @@ const App: React.FC = () => {
         setItems(dedupedItems);
         
         if (data.users) setUsers(data.users);
+        if (data.encryptionActive !== undefined) {
+          setEncryptionEnabled(data.encryptionActive);
+        }
         setDataSource('cloud');
         setSyncStatus('success');
         setLastSyncedAt(new Date());
@@ -460,6 +464,11 @@ const App: React.FC = () => {
                           <span className="hidden sm:inline">{dataSource === 'cloud' ? 'Cloud Connected' : 'Local Mode'}</span>
                           <span className="sm:hidden">{dataSource === 'cloud' ? 'Cloud' : 'Local'}</span>
                         </span>
+                        {dataSource === 'cloud' && (
+                          <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${encryptionEnabled ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                            <span>{encryptionEnabled ? '🔒 암호화 적용됨' : '🔓 암호화 미적용 (설정필요)'}</span>
+                          </span>
+                        )}
                         {syncStatus === 'loading' && <SyncIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-indigo-400 animate-spin" />}
                       </div>
                     </div>
