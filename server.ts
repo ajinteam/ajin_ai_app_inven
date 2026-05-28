@@ -100,7 +100,11 @@ async function startServer() {
       }
       
       // Always guarantee users: [] default structure
-      res.json(data || { items: [], users: [], lastUpdated: null });
+      const finalData = data || { items: [], users: [], lastUpdated: null };
+      res.json({
+        ...finalData,
+        encryptionActive: !!process.env.ENCRYPTION_KEY
+      });
     } catch (error: any) {
       console.error('Inventory GET Error:', error);
       res.status(500).json({ error: 'Internal Server Error', details: error.message });
