@@ -41,6 +41,11 @@ const App: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'inventory'} | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
 
+  // Restore States
+  const [showRestorePrompt, setShowRestorePrompt] = useState<{ itemId: string, transactionId: string, originalRemarks: string } | null>(null);
+  const [restoreActionText, setRestoreActionText] = useState<'수리' | '교환' | '직접입력'>('수리');
+  const [restoreDetailText, setRestoreDetailText] = useState('');
+
   const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline'>('loading');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [dataSource, setDataSource] = useState<'cloud' | 'local'>('local');
@@ -305,6 +310,40 @@ const App: React.FC = () => {
       }
       return item;
     }));
+  };
+
+  const handleRestoreSubmit = () => {
+    if (!showRestorePrompt) return;
+    const { itemId, transactionId, originalRemarks } = showRestorePrompt;
+
+    let actionLabel = '';
+    if (restoreActionText === '수리') {
+      actionLabel = '수리';
+    } else if (restoreActionText === '교환') {
+      actionLabel = '교환';
+    } else {
+      actionLabel = restoreDetailText.trim();
+    }
+
+    if (!actionLabel) {
+      alert('처리에 관한 내용(또는 직접 입력 내용)을 입력하세요.');
+      return;
+    }
+
+    const finalRemarks = originalRemarks 
+      ? `${originalRemarks} / 복원: ${actionLabel}` 
+      : `복원: ${actionLabel}`;
+
+    handleUpdateTransaction(itemId, transactionId, {
+      isReturned: false,
+      returnReason: undefined,
+      remarks: finalRemarks
+    });
+
+    setShowRestorePrompt(null);
+    setRestoreActionText('수리');
+    setRestoreDetailText('');
+    alert('원래 출고 상태로 복원되었습니다.');
   };
 
   const handleDeleteTransaction = (itemId: string, transactionId: string) => {
@@ -632,7 +671,14 @@ const App: React.FC = () => {
                                   폐기
                                 </button>
                                 <button 
-                                  onClick={() => handleUpdateTransaction(item.id, transaction.id, { isReturned: false, returnReason: undefined })}
+                                  id={`return_restore_btn_${transaction.id}`}
+                                  onClick={() => {
+                                    setShowRestorePrompt({
+                                      itemId: item.id,
+                                      transactionId: transaction.id,
+                                      originalRemarks: transaction.remarks || ''
+                                    });
+                                  }}
                                   className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg font-black text-[10px] uppercase border border-indigo-100 hover:bg-indigo-600 hover:text-white"
                                 >
                                   원복
@@ -726,6 +772,83 @@ const App: React.FC = () => {
                     <button onClick={handleDeleteItemConfirm} className="py-3 sm:py-4 bg-rose-600 text-white rounded-lg sm:rounded-xl font-black uppercase text-xs sm:text-sm tracking-widest shadow-lg shadow-rose-100">삭제 확정</button>
                 </div>
             </div>
+        </div>
+      )}
+
+      {showRestorePrompt && (
+        <div id="app_restore_action_modal" className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-fade-in-up">
+            <h4 className="text-2xl font-black text-slate-800 mb-6 tracking-tight uppercase">반품 복원 조치 선택</h4>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">처리 결과 선택</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['수리', '교환', '직접입력'] as const).map(action => (
+                    <button
+                      key={action}
+                      type="button"
+                      id={`app_restore_action_btn_${action}`}
+                      onClick={() => setRestoreActionText(action)}
+                      className={`py-3 rounded-xl font-black text-xs transition-all border ${
+                        restoreActionText === action
+                          ? 'bg-sky-500 text-white border-sky-500 shadow-md shadow-sky-100'
+                          : 'bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100'
+                      }`}
+                    >
+                      {action}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {restoreActionText === '직접입력' ? (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">원하는 조치 내용 직접 입력</label>
+                  <input 
+                    type="text"
+                    id="app_restore_action_custom_input"
+                    value={restoreDetailText} 
+                    onChange={(e) => setRestoreDetailText(e.target.value)}
+                    placeholder="조치 내용을 자유롭게 입력하세요..."
+                    className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">상세 메모 (선택사항)</label>
+                  <input 
+                    type="text"
+                    id="app_restore_action_detail_input"
+                    value={restoreDetailText} 
+                    onChange={(e) => setRestoreDetailText(e.target.value)}
+                    placeholder="추가 설명이 필요하면 적어주세요..."
+                    className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 mt-6">
+                <button 
+                  id="app_restore_action_cancel_btn"
+                  onClick={() => {
+                    setShowRestorePrompt(null);
+                    setRestoreActionText('수리');
+                    setRestoreDetailText('');
+                  }} 
+                  className="py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm tracking-widest"
+                >
+                  취소
+                </button>
+                <button 
+                  id="app_restore_action_confirm_btn"
+                  onClick={handleRestoreSubmit} 
+                  className="py-4 bg-sky-500 text-white rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-sky-100"
+                >
+                  원복 확정
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -78,6 +78,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [returnReason, setReturnReason] = useState('도장불량');
   const [returnRemarks, setReturnRemarks] = useState('');
 
+  // Restore State
+  const [showRestorePrompt, setShowRestorePrompt] = useState<{ itemId: string, transactionId: string, originalRemarks: string } | null>(null);
+  const [restoreActionText, setRestoreActionText] = useState<'수리' | '교환' | '직접입력'>('수리');
+  const [restoreDetailText, setRestoreDetailText] = useState('');
+
   // History Search State
   const [historySearchTerm, setHistorySearchTerm] = useState('');
 
@@ -133,6 +138,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       .reduce((acc, t) => acc + t.quantity, 0);
   }, [item.transactions]);
 
+  const daecheonWasteSum = useMemo(() => {
+    return item.transactions
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천폐기')
+      .reduce((acc, t) => acc + t.quantity, 0);
+  }, [item.transactions]);
+
   const daecheonASSum = useMemo(() => {
     const releaseS = item.transactions
       .filter(t => t.type === 'release' && !t.isDiscarded && t.customerName && (t.customerName.trim() === '대천' || t.customerName.trim() === '대천공장'))
@@ -140,7 +151,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     const purchaseS = item.transactions
       .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천공장')
       .reduce((acc, t) => acc + t.quantity, 0);
-    return Math.max(0, releaseS - purchaseS);
+    const wasteS = item.transactions
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천폐기')
+      .reduce((acc, t) => acc + t.quantity, 0);
+    return Math.max(0, releaseS - purchaseS - wasteS);
   }, [item.transactions]);
 
   const isSerialDuplicate = useMemo(() => (!serialNumber.trim() || serialNumber.includes('~')) ? false : allUsedSerials.includes(serialNumber.toUpperCase()), [serialNumber, allUsedSerials]);
@@ -287,6 +301,40 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     }
   };
 
+  const handleRestoreSubmit = () => {
+    if (!showRestorePrompt) return;
+    const { itemId, transactionId, originalRemarks } = showRestorePrompt;
+
+    let actionLabel = '';
+    if (restoreActionText === '수리') {
+      actionLabel = '수리';
+    } else if (restoreActionText === '교환') {
+      actionLabel = '교환';
+    } else {
+      actionLabel = restoreDetailText.trim();
+    }
+
+    if (!actionLabel) {
+      alert('처리에 관한 내용(또는 직접 입력 내용)을 입력하세요.');
+      return;
+    }
+
+    const finalRemarks = originalRemarks 
+      ? `${originalRemarks} / 복원: ${actionLabel}` 
+      : `복원: ${actionLabel}`;
+
+    onUpdateTransaction(itemId, transactionId, {
+      isReturned: false,
+      returnReason: '',
+      remarks: finalRemarks
+    });
+
+    setShowRestorePrompt(null);
+    setRestoreActionText('수리');
+    setRestoreDetailText('');
+    alert('원래 출고 상태로 복원되었습니다.');
+  };
+
   const handleDeleteTrans = (id: string) => {
     setShowPasswordInput({ type: 'trans_delete', targetId: id });
   };
@@ -350,6 +398,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div className="flex flex-col items-center">
                 <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">대천AS</span>
                 <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{daecheonASSum}</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">대천폐기</span>
+                <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{daecheonWasteSum}</div>
               </div>
             </div>
           </div>
@@ -619,17 +671,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                                     )}
                                                     {t.type === 'release' && t.isReturned && (
                                                       <button 
+                                                        id={`detail_return_cancel_btn_${t.id}`}
                                                         onClick={() => {
-                                                          let cleanedRemarks = t.remarks || '';
-                                                          if (cleanedRemarks.includes(' / 반품:')) {
-                                                            cleanedRemarks = cleanedRemarks.split(' / 반품:')[0];
-                                                          } else if (cleanedRemarks.startsWith('반품:')) {
-                                                            cleanedRemarks = '';
-                                                          }
-                                                          onUpdateTransaction(item.id, t.id, { 
-                                                            isReturned: false, 
-                                                            returnReason: '',
-                                                            remarks: cleanedRemarks 
+                                                          setShowRestorePrompt({
+                                                            itemId: item.id,
+                                                            transactionId: t.id,
+                                                            originalRemarks: t.remarks || ''
                                                           });
                                                         }}
                                                         className="px-2 py-1 bg-sky-50 text-sky-600 border border-sky-100 rounded text-[10px] font-black hover:bg-sky-600 hover:text-white transition-all whitespace-nowrap"
@@ -659,6 +706,83 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
         </div>
       </div>
+      {showRestorePrompt && (
+                                        <div id="restore_action_modal" className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[70] flex items-center justify-center p-4">
+                                          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-fade-in-up">
+                                            <h4 className="text-2xl font-black text-slate-800 mb-6 tracking-tight uppercase">반품취소 / 원복 조치 선택</h4>
+                                            <div className="space-y-4">
+                                              <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">처리 결과 선택</label>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                  {(['수리', '교환', '직접입력'] as const).map(action => (
+                                                    <button
+                                                      key={action}
+                                                      type="button"
+                                                      id={`restore_action_btn_${action}`}
+                                                      onClick={() => setRestoreActionText(action)}
+                                                      className={`py-3 rounded-xl font-black text-xs transition-all border ${
+                                                        restoreActionText === action
+                                                          ? 'bg-sky-500 text-white border-sky-500 shadow-md shadow-sky-100'
+                                                          : 'bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100'
+                                                      }`}
+                                                    >
+                                                      {action}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                              
+                                              {restoreActionText === '직접입력' ? (
+                                                <div>
+                                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">원하는 조치 내용 직접 입력</label>
+                                                  <input 
+                                                    type="text"
+                                                    id="restore_action_custom_input"
+                                                    value={restoreDetailText} 
+                                                    onChange={(e) => setRestoreDetailText(e.target.value)}
+                                                    placeholder="조치 내용을 자유롭게 입력하세요..."
+                                                    className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400"
+                                                  />
+                                                </div>
+                                              ) : (
+                                                <div>
+                                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">상세 메모 (선택사항)</label>
+                                                  <input 
+                                                    type="text"
+                                                    id="restore_action_detail_input"
+                                                    value={restoreDetailText} 
+                                                    onChange={(e) => setRestoreDetailText(e.target.value)}
+                                                    placeholder="추가 설명이 필요하면 적어주세요..."
+                                                    className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400"
+                                                  />
+                                                </div>
+                                              )}
+
+                                              <div className="grid grid-cols-2 gap-4 mt-6">
+                                                <button 
+                                                  id="restore_action_cancel_btn"
+                                                  onClick={() => {
+                                                    setShowRestorePrompt(null);
+                                                    setRestoreActionText('수리');
+                                                    setRestoreDetailText('');
+                                                  }} 
+                                                  className="py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm tracking-widest"
+                                                >
+                                                  취소
+                                                </button>
+                                                <button 
+                                                  id="restore_action_confirm_btn"
+                                                  onClick={handleRestoreSubmit} 
+                                                  className="py-4 bg-sky-500 text-white rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-sky-100"
+                                                >
+                                                  출고 복원
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+
       {showReturnModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[70] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-fade-in-up">
