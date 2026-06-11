@@ -108,6 +108,41 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   }, [serialNumber, item.type]);
 
   const currentStock = useMemo(() => item.transactions.reduce((acc, t) => t.type === 'purchase' ? acc + t.quantity : acc - t.quantity, 0), [item.transactions]);
+
+  const purchaseSum = useMemo(() => {
+    return item.transactions
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && (!t.customerName || t.customerName.trim() === ''))
+      .reduce((acc, t) => acc + t.quantity, 0);
+  }, [item.transactions]);
+
+  const releaseSum = useMemo(() => {
+    return item.transactions
+      .filter(t => t.type === 'release' && !t.isDiscarded)
+      .reduce((acc, t) => acc + t.quantity, 0);
+  }, [item.transactions]);
+
+  const saleSum = useMemo(() => {
+    return item.transactions
+      .filter(t => t.type === 'release' && !t.isDiscarded && (!t.customerName || (t.customerName.trim() !== '대천' && t.customerName.trim() !== '대천공장')))
+      .reduce((acc, t) => acc + t.quantity, 0);
+  }, [item.transactions]);
+
+  const returnASSum = useMemo(() => {
+    return item.transactions
+      .filter(t => t.type === 'release' && t.isReturned && !t.isDiscarded)
+      .reduce((acc, t) => acc + t.quantity, 0);
+  }, [item.transactions]);
+
+  const daecheonASSum = useMemo(() => {
+    const releaseS = item.transactions
+      .filter(t => t.type === 'release' && !t.isDiscarded && t.customerName && (t.customerName.trim() === '대천' || t.customerName.trim() === '대천공장'))
+      .reduce((acc, t) => acc + t.quantity, 0);
+    const purchaseS = item.transactions
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천공장')
+      .reduce((acc, t) => acc + t.quantity, 0);
+    return Math.max(0, releaseS - purchaseS);
+  }, [item.transactions]);
+
   const isSerialDuplicate = useMemo(() => (!serialNumber.trim() || serialNumber.includes('~')) ? false : allUsedSerials.includes(serialNumber.toUpperCase()), [serialNumber, allUsedSerials]);
   const isCodeDuplicate = useMemo(() => (!editFormData.code || editFormData.code === item.code) ? false : existingCodes.some(c => c.toUpperCase() === editFormData.code?.toUpperCase()), [editFormData.code, existingCodes, item.code]);
 
@@ -290,15 +325,41 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
             </div>
         )}
-        <div className="p-4 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div><h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase">재고 상세 관리</h2></div>
-          <div className="flex gap-2 sm:gap-4">
-              <button onClick={handleToggleEdit} className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black transition-all shadow-sm ${isEditing ? 'bg-emerald-500 text-white' : 'bg-white text-indigo-600 border-2 border-indigo-50'}`}>
+        <div className="p-4 sm:p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 w-full md:w-auto">
+            <div><h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase whitespace-nowrap">재고 상세 관리</h2></div>
+            
+            {/* 수량 요약 박스 그룹 */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              <div className="flex flex-col items-center">
+                <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">입고</span>
+                <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{purchaseSum}</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">출고</span>
+                <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{releaseSum}</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">판매</span>
+                <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{saleSum}</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">반품AS</span>
+                <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{returnASSum}</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">대천AS</span>
+                <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{daecheonASSum}</div>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 sm:gap-4 w-full md:w-auto justify-end">
+              <button id="detail_edit_btn" onClick={handleToggleEdit} className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black transition-all shadow-sm ${isEditing ? 'bg-emerald-500 text-white' : 'bg-white text-indigo-600 border-2 border-indigo-50'}`}>
                 {isEditing ? <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <EditIcon className="w-4 h-4 sm:w-5 sm:h-5" />}
                 <span className="hidden xs:inline">{isEditing ? '저장' : '정보 수정'}</span>
               </button>
-              {isEditing && <button onClick={() => setIsEditing(false)} className="px-3 sm:px-6 py-2 sm:py-3 bg-slate-100 text-slate-600 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black uppercase">취소</button>}
-              <button onClick={onClose} className="p-1 sm:p-3 text-slate-400 hover:text-slate-800 transition-colors ml-1 sm:ml-4"><CloseIcon className="w-8 h-8 sm:w-10 sm:h-10" /></button>
+              {isEditing && <button id="detail_cancel_btn" onClick={() => setIsEditing(false)} className="px-3 sm:px-6 py-2 sm:py-3 bg-slate-100 text-slate-600 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black uppercase">취소</button>}
+              <button id="detail_close_btn" onClick={onClose} className="p-1 sm:p-3 text-slate-400 hover:text-slate-800 transition-colors ml-1 sm:ml-4"><CloseIcon className="w-8 h-8 sm:w-10 sm:h-10" /></button>
           </div>
         </div>
         <div className="flex-grow overflow-hidden p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
@@ -450,7 +511,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                             </thead>
                             <tbody className="divide-y-2 divide-white">
                                 {filteredHistory.map(t => (
-                                    <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''}`}>
+                                    <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''} ${t.isReturned ? 'bg-amber-50/30' : ''}`}>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4">
                                           <div className="flex items-center gap-2 sm:gap-3">
                                             <div className={`p-1 sm:p-1.5 rounded-lg ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
@@ -554,6 +615,26 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                                         className="px-2 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded text-[10px] font-black hover:bg-amber-600 hover:text-white transition-all"
                                                       >
                                                         반품
+                                                      </button>
+                                                    )}
+                                                    {t.type === 'release' && t.isReturned && (
+                                                      <button 
+                                                        onClick={() => {
+                                                          let cleanedRemarks = t.remarks || '';
+                                                          if (cleanedRemarks.includes(' / 반품:')) {
+                                                            cleanedRemarks = cleanedRemarks.split(' / 반품:')[0];
+                                                          } else if (cleanedRemarks.startsWith('반품:')) {
+                                                            cleanedRemarks = '';
+                                                          }
+                                                          onUpdateTransaction(item.id, t.id, { 
+                                                            isReturned: false, 
+                                                            returnReason: '',
+                                                            remarks: cleanedRemarks 
+                                                          });
+                                                        }}
+                                                        className="px-2 py-1 bg-sky-50 text-sky-600 border border-sky-100 rounded text-[10px] font-black hover:bg-sky-600 hover:text-white transition-all whitespace-nowrap"
+                                                      >
+                                                        반품취소
                                                       </button>
                                                     )}
                                                   </>
