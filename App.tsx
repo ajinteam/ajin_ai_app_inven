@@ -52,6 +52,7 @@ const App: React.FC = () => {
   const [encryptionEnabled, setEncryptionEnabled] = useState<boolean>(false);
   const isInitialLoad = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isHandlingPopstate = useRef(false);
 
   const fetchFromCloud = async () => {
     setSyncStatus('loading');
@@ -137,6 +138,99 @@ const App: React.FC = () => {
       isInitialLoad.current = false;
     });
   }, []);
+
+  const computeHash = (
+    tab: string,
+    detailId: string | null,
+    addItem: boolean,
+    release: boolean,
+    buyer: boolean,
+    userMgmt: boolean
+  ) => {
+    if (!authRole) return '';
+    let h = `tab=${tab}`;
+    if (addItem) h += `&modal=addItem`;
+    else if (release) h += `&modal=release`;
+    else if (buyer) h += `&modal=buyerSearch`;
+    else if (userMgmt) h += `&modal=userManagement`;
+    else if (detailId) h += `&modal=detail&id=${detailId}`;
+    return h;
+  };
+
+  useEffect(() => {
+    if (!authRole) {
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      return;
+    }
+
+    if (isHandlingPopstate.current) return;
+
+    const expectedHash = '#' + computeHash(
+      activeTab,
+      selectedItemId,
+      showAddItemModal,
+      showProductReleaseModal,
+      showBuyerSearchModal,
+      showUserManagementModal
+    );
+
+    if (window.location.hash !== expectedHash) {
+      const currentHash = window.location.hash;
+      if (!currentHash || currentHash === '#') {
+        window.history.replaceState({ activeTab, selectedItemId }, '', expectedHash);
+      } else {
+        window.history.pushState({ activeTab, selectedItemId }, '', expectedHash);
+      }
+    }
+  }, [
+    authRole,
+    activeTab,
+    selectedItemId,
+    showAddItemModal,
+    showProductReleaseModal,
+    showBuyerSearchModal,
+    showUserManagementModal
+  ]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (!authRole) return;
+
+      const hash = window.location.hash.replace('#', '');
+      if (!hash) {
+        handleLogout();
+        return;
+      }
+
+      isHandlingPopstate.current = true;
+
+      const params = new URLSearchParams(hash);
+      const tab = params.get('tab') as 'part' | 'product' | 'return' | null;
+      const modal = params.get('modal');
+      const id = params.get('id');
+
+      if (tab && (tab === 'part' || tab === 'product' || tab === 'return')) {
+        setActiveTab(tab);
+      }
+
+      setShowAddItemModal(modal === 'addItem');
+      setShowProductReleaseModal(modal === 'release');
+      setShowBuyerSearchModal(modal === 'buyerSearch');
+      setShowUserManagementModal(modal === 'userManagement');
+      setSelectedItemId(modal === 'detail' ? id : null);
+
+      setTimeout(() => {
+        isHandlingPopstate.current = false;
+      }, 50);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [authRole]);
 
  useEffect(() => {
   // 초기 로드 중에는 클라우드에 빈 값을 저장하지 않음
