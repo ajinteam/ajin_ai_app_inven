@@ -17,6 +17,7 @@ const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Mat
 
 const calculateStock = (item: Item): number => {
   return item.transactions.reduce((acc, t) => {
+    if (t.isDiscarded) return acc;
     return t.type === 'purchase' ? acc + t.quantity : acc - t.quantity;
   }, 0);
 };

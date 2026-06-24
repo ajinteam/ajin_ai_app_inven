@@ -55,6 +55,14 @@ const parseSerialRange = (input: string): string[] => {
   return results;
 };
 
+const toLocalDatetimeString = (dateStr: string | number | undefined): string => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+};
+
 const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ 
   item, authRole, allUsedSerials, existingCodes, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose 
 }) => {
@@ -112,7 +120,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     }
   }, [serialNumber, item.type]);
 
-  const currentStock = useMemo(() => item.transactions.reduce((acc, t) => t.type === 'purchase' ? acc + t.quantity : acc - t.quantity, 0), [item.transactions]);
+  const currentStock = useMemo(() => item.transactions.reduce((acc, t) => {
+    if (t.isDiscarded) return acc;
+    return t.type === 'purchase' ? acc + t.quantity : acc - t.quantity;
+  }, 0), [item.transactions]);
 
   const purchaseSum = useMemo(() => {
     return item.transactions
@@ -163,28 +174,18 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   // Filtered History
   const filteredHistory = useMemo(() => {
     const term = historySearchTerm.toLowerCase().trim();
-    if (!term) return [...item.transactions].reverse();
-    
-    const allTrans = [...item.transactions].reverse();
+    const sortedTrans = [...item.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (!term) return sortedTrans;
     
     // Exact serial match priority
-    const exactMatches = allTrans.filter(t => 
+    const exactMatches = sortedTrans.filter(t => 
       t.serialNumber?.toLowerCase() === term || 
       t.originalSerialNumber?.toLowerCase() === term
     );
     
     if (exactMatches.length > 0) return exactMatches;
     
-    // If the term looks like a serial number (e.g. starts with letters and has numbers, or just long enough), 
-    // we might want to be stricter. But the user said "match only the number".
-    // If we are here, it means no exact match was found.
-    // If the user is searching for a serial number, they probably don't want partial matches of other serials.
-    
-    return allTrans.filter(t => {
-      // If it's a serial number field, we only allow exact match (which we already checked above and failed)
-      // So we effectively disable partial matching for serial numbers if we want to be strict.
-      // However, we still want partial matching for customer name, remarks, etc.
-      
+    return sortedTrans.filter(t => {
       const serialMatch = t.serialNumber?.toLowerCase() === term || t.originalSerialNumber?.toLowerCase() === term;
       const otherMatch = t.customerName?.toLowerCase().includes(term) || 
                          t.remarks?.toLowerCase().includes(term) ||
@@ -262,7 +263,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const handleTransEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const processedValue = (name === 'quantity') ? (parseInt(value, 10) || 0) : (['code', 'name', 'serialNumber'].includes(name) ? value.toUpperCase() : value);
+    const processedValue = (name === 'quantity') ? (parseInt(value, 10) || 0) : 
+                           (name === 'date') ? (value ? new Date(value).toISOString() : new Date().toISOString()) :
+                           (['code', 'name', 'serialNumber'].includes(name) ? value.toUpperCase() : value);
     setTransEditData(prev => ({ ...prev, [name]: processedValue }));
   };
 
@@ -569,10 +572,20 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                             <div className={`p-1 sm:p-1.5 rounded-lg ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
                                               {t.type === 'purchase' ? <ArrowUpIcon className="w-3 h-3 sm:w-4 sm:h-4"/> : <ArrowDownIcon className="w-3 h-3 sm:w-4 sm:h-4"/>}
                                             </div>
-                                            <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
-                                              <p className="font-black text-slate-700 text-[10px] sm:text-sm">{new Date(t.date).toLocaleDateString()}</p>
-                                              <p className="text-[8px] text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                                            </div>
+                                            {editingTransactionId === t.id && authRole === 'admin' ? (
+                                              <input
+                                                type="datetime-local"
+                                                name="date"
+                                                value={toLocalDatetimeString(transEditData.date)}
+                                                onChange={handleTransEditChange}
+                                                className="px-2 py-1 border-2 rounded-lg bg-white font-bold text-[10px] sm:text-xs"
+                                              />
+                                            ) : (
+                                              <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
+                                                <p className="font-black text-slate-700 text-[10px] sm:text-sm">{new Date(t.date).toLocaleDateString()}</p>
+                                                <p className="text-[8px] text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                              </div>
+                                            )}
                                           </div>
                                         </td>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4">
