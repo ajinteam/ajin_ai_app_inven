@@ -38,7 +38,7 @@ const parseSerialRange = (input: string): string[] => {
   const startNum = parseInt(startNumStr, 10);
   const endNum = parseInt(endNumStr, 10);
   if (isNaN(startNum) || isNaN(endNum) || startNum > endNum) return [input.trim()];
-  if (endNum - startNum >= 100) return [input.trim()]; // 범위 제한
+  if (endNum - startNum >= 1000) return [input.trim()]; // 범위 제한
   const results: string[] = [];
   const padLength = startNumStr.length;
   for (let i = startNum; i <= endNum; i++) {

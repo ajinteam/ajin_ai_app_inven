@@ -9,6 +9,7 @@ interface ItemDetailModalProps {
   allUsedSerials: string[];
   existingCodes: string[];
   onAddTransaction: (itemId: string, transaction: Omit<Transaction, 'id'>) => void;
+  onAddTransactions?: (itemId: string, transactions: Omit<Transaction, 'id'>[]) => void;
   onUpdateTransaction: (itemId: string, transactionId: string, updatedData: Partial<Transaction>) => void;
   onDeleteTransaction: (itemId: string, transactionId: string) => void;
   onUpdateItem: (itemId: string, updatedData: Partial<Item>) => void;
@@ -45,7 +46,7 @@ const parseSerialRange = (input: string): string[] => {
   const startNum = parseInt(startNumStr, 10);
   const endNum = parseInt(endNumStr, 10);
   if (isNaN(startNum) || isNaN(endNum) || startNum > endNum) return [input.trim()];
-  if (endNum - startNum >= 100) throw new Error('범위는 최대 100개까지 가능합니다.');
+  if (endNum - startNum >= 1000) throw new Error('범위는 최대 1000개까지 가능합니다.');
   const results: string[] = [];
   const padLength = startNumStr.length;
   for (let i = startNum; i <= endNum; i++) {
@@ -64,7 +65,7 @@ const toLocalDatetimeString = (dateStr: string | number | undefined): string => 
 };
 
 const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ 
-  item, authRole, allUsedSerials, existingCodes, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose 
+  item, authRole, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose 
 }) => {
   const [transactionType, setTransactionType] = useState<'purchase' | 'release'>('purchase');
   const [quantity, setQuantity] = useState('');
@@ -127,7 +128,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const purchaseSum = useMemo(() => {
     return item.transactions
-      .filter(t => t.type === 'purchase' && !t.isDiscarded && (!t.customerName || t.customerName.trim() === ''))
+      .filter(t => t.type === 'purchase' && !t.isDiscarded)
       .reduce((acc, t) => acc + t.quantity, 0);
   }, [item.transactions]);
 
@@ -217,11 +218,23 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (transactionType === 'release' && count > currentStock) { alert('재고 부족!'); return; }
     
     if (isRange) {
-      targetSerials.forEach(s => onAddTransaction(item.id, { 
-        type: transactionType, quantity: 1, date: new Date().toISOString(), 
-        remarks: transRemarks, modelName: transModelName, userId: transUserId, 
-        serialNumber: s, customerName, address, phoneNumber 
-      }));
+      const baseTime = Date.now();
+      if (onAddTransactions) {
+        const batch: Omit<Transaction, 'id'>[] = targetSerials.map((s, index) => ({
+          type: transactionType, quantity: 1, 
+          date: new Date(baseTime + index).toISOString(), 
+          remarks: transRemarks, modelName: transModelName, userId: transUserId, 
+          serialNumber: s, customerName, address, phoneNumber 
+        }));
+        onAddTransactions(item.id, batch);
+      } else {
+        targetSerials.forEach((s, index) => onAddTransaction(item.id, { 
+          type: transactionType, quantity: 1, 
+          date: new Date(baseTime + index).toISOString(), 
+          remarks: transRemarks, modelName: transModelName, userId: transUserId, 
+          serialNumber: s, customerName, address, phoneNumber 
+        }));
+      }
       alert(`${targetSerials.length}건이 일련번호 기반으로 개별 등록되었습니다.`);
     } else {
       onAddTransaction(item.id, { 

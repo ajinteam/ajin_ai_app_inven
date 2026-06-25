@@ -13,7 +13,11 @@ const USERS_STORAGE_KEY = 'inventory_system_users_v2';
 const ADMIN_PASSWORD = '5200';
 const PRODUCT_ONLY_PASSWORD = '2611';
 
-const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+let idCounter = 0;
+const generateId = (prefix: string) => {
+  idCounter++;
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}-${idCounter}`;
+};
 
 const calculateStock = (item: Item): number => {
   return item.transactions.reduce((acc, t) => {
@@ -393,6 +397,16 @@ const App: React.FC = () => {
     setItems(prev => prev.map(item => {
       if (item.id === itemId) {
         return { ...item, transactions: [...item.transactions, newTransaction] };
+      }
+      return item;
+    }));
+  };
+
+  const handleBatchAddTransactions = (itemId: string, transactionsData: Omit<Transaction, 'id'>[]) => {
+    const newTransactions = transactionsData.map(t => ({ ...t, id: generateId('t') }));
+    setItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        return { ...item, transactions: [...item.transactions, ...newTransactions] };
       }
       return item;
     }));
@@ -978,6 +992,7 @@ const App: React.FC = () => {
           allUsedSerials={allUsedSerials} 
           existingCodes={items.map(i => i.code)}
           onAddTransaction={handleAddTransaction} 
+          onAddTransactions={handleBatchAddTransactions}
           onUpdateTransaction={handleUpdateTransaction} 
           onDeleteTransaction={handleDeleteTransaction} 
           onUpdateItem={handleUpdateItem} 
