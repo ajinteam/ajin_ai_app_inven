@@ -47,7 +47,13 @@ const App: React.FC = () => {
   const [deletePassword, setDeletePassword] = useState('');
 
   // Restore States
-  const [showRestorePrompt, setShowRestorePrompt] = useState<{ itemId: string, transactionId: string, originalRemarks: string } | null>(null);
+  const [selectedReturnIds, setSelectedReturnIds] = useState<string[]>([]);
+  const [showRestorePrompt, setShowRestorePrompt] = useState<{ 
+    itemId?: string; 
+    transactionId?: string; 
+    originalRemarks?: string; 
+    transactionIds?: { itemId: string; transactionId: string; originalRemarks: string }[];
+  } | null>(null);
   const [restoreActionText, setRestoreActionText] = useState<'수리' | '교환' | '직접입력'>('수리');
   const [restoreDetailText, setRestoreDetailText] = useState('');
 
@@ -423,7 +429,6 @@ const App: React.FC = () => {
 
   const handleRestoreSubmit = () => {
     if (!showRestorePrompt) return;
-    const { itemId, transactionId, originalRemarks } = showRestorePrompt;
 
     let actionLabel = '';
     if (restoreActionText === '수리') {
@@ -439,20 +444,110 @@ const App: React.FC = () => {
       return;
     }
 
-    const finalRemarks = originalRemarks 
-      ? `${originalRemarks} / 복원: ${actionLabel}` 
-      : `복원: ${actionLabel}`;
+    if (showRestorePrompt.transactionIds && showRestorePrompt.transactionIds.length > 0) {
+      setItems(prev => prev.map(item => {
+        const itemRestores = showRestorePrompt.transactionIds!.filter(r => r.itemId === item.id);
+        if (itemRestores.length > 0) {
+          return {
+            ...item,
+            transactions: item.transactions.map(t => {
+              const r = itemRestores.find(x => x.transactionId === t.id);
+              if (r) {
+                const finalRemarks = r.originalRemarks 
+                  ? `${r.originalRemarks} / 복원: ${actionLabel}` 
+                  : `복원: ${actionLabel}`;
+                return {
+                  ...t,
+                  isReturned: false,
+                  returnReason: undefined,
+                  remarks: finalRemarks
+                };
+              }
+              return t;
+            })
+          };
+        }
+        return item;
+      }));
+      setSelectedReturnIds([]);
+      alert(`${showRestorePrompt.transactionIds.length}건이 일괄 원래 출고 상태로 복원되었습니다.`);
+    } else if (showRestorePrompt.itemId && showRestorePrompt.transactionId) {
+      const { itemId, transactionId, originalRemarks } = showRestorePrompt;
+      const finalRemarks = originalRemarks 
+        ? `${originalRemarks} / 복원: ${actionLabel}` 
+        : `복원: ${actionLabel}`;
 
-    handleUpdateTransaction(itemId, transactionId, {
-      isReturned: false,
-      returnReason: undefined,
-      remarks: finalRemarks
-    });
+      handleUpdateTransaction(itemId, transactionId, {
+        isReturned: false,
+        returnReason: undefined,
+        remarks: finalRemarks
+      });
+      alert('원래 출고 상태로 복원되었습니다.');
+    }
 
     setShowRestorePrompt(null);
     setRestoreActionText('수리');
     setRestoreDetailText('');
-    alert('원래 출고 상태로 복원되었습니다.');
+  };
+
+  const handleBatchReturnRestore = () => {
+    if (selectedReturnIds.length === 0) {
+      alert('원복할 품목을 선택해주세요.');
+      return;
+    }
+    
+    const restoreList: { itemId: string; transactionId: string; originalRemarks: string }[] = [];
+    items.forEach(item => {
+      item.transactions.forEach(t => {
+        if (selectedReturnIds.includes(t.id)) {
+          restoreList.push({
+            itemId: item.id,
+            transactionId: t.id,
+            originalRemarks: t.remarks || ''
+          });
+        }
+      });
+    });
+
+    if (restoreList.length === 0) return;
+
+    setShowRestorePrompt({
+      transactionIds: restoreList
+    });
+  };
+
+  const handleBatchReturnDiscard = () => {
+    if (selectedReturnIds.length === 0) {
+      alert('폐기할 품목을 선택해주세요.');
+      return;
+    }
+    if (confirm(`선택한 ${selectedReturnIds.length}개 반품 품목을 일괄 폐기하시겠습니까?`)) {
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      setItems(prev => prev.map(item => {
+        const hasSelected = item.transactions.some(t => selectedReturnIds.includes(t.id));
+        if (hasSelected) {
+          return {
+            ...item,
+            transactions: item.transactions.map(t => {
+              if (selectedReturnIds.includes(t.id)) {
+                const newRemarks = t.remarks ? `${t.remarks} / 폐기(${dateStr})` : `폐기(${dateStr})`;
+                return {
+                  ...t,
+                  isDiscarded: true,
+                  remarks: newRemarks
+                };
+              }
+              return t;
+            })
+          };
+        }
+        return item;
+      }));
+      setSelectedReturnIds([]);
+      alert('선택한 품목들이 일괄 폐기되었습니다.');
+    }
   };
 
   const handleDeleteTransaction = (itemId: string, transactionId: string) => {
@@ -724,11 +819,52 @@ const App: React.FC = () => {
         </div>
 
         <div className="bg-white shadow-xl sm:shadow-2xl border border-slate-100 rounded-2xl sm:rounded-[2.5rem] overflow-hidden relative">
+          {activeTab === 'return' && selectedReturnIds.length > 0 && (
+            <div className="bg-indigo-50 border-b border-indigo-100 px-4 sm:px-10 py-4 sm:py-5 flex items-center justify-between text-sm sm:text-base animate-fade-in z-20">
+              <span className="font-black text-indigo-800">
+                선택됨: <span className="text-base sm:text-xl text-indigo-600 font-extrabold">{selectedReturnIds.length}</span>개 반품 품목
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleBatchReturnRestore}
+                  className="px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs sm:text-sm transition-colors shadow-sm cursor-pointer"
+                >
+                  일괄 원복
+                </button>
+                <button
+                  onClick={handleBatchReturnDiscard}
+                  className="px-3 sm:px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs sm:text-sm transition-colors shadow-sm cursor-pointer"
+                >
+                  일괄 폐기
+                </button>
+                <button
+                  onClick={() => setSelectedReturnIds([])}
+                  className="px-2.5 py-2 bg-white text-slate-500 border border-slate-200 hover:bg-slate-100 rounded-xl font-black text-xs sm:text-sm transition-colors cursor-pointer"
+                >
+                  선택 해제
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto scrollbar-hide">
             {activeTab === 'return' ? (
               <table className="w-full text-left min-w-[800px]">
                 <thead className="text-[10px] sm:text-sm text-slate-400 uppercase bg-slate-50/50 border-b border-slate-100 font-black tracking-widest sm:tracking-[0.2em]">
                   <tr>
+                    <th className="px-4 sm:px-10 py-4 sm:py-7 w-12 text-center select-none">
+                      <input 
+                        type="checkbox"
+                        className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        checked={(filteredInventory as any[]).length > 0 && selectedReturnIds.length === (filteredInventory as any[]).length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedReturnIds((filteredInventory as any[]).map(({ transaction }) => transaction.id));
+                          } else {
+                            setSelectedReturnIds([]);
+                          }
+                        }}
+                      />
+                    </th>
                     <th className="px-4 sm:px-10 py-4 sm:py-7">제품 정보</th>
                     <th className="px-4 sm:px-10 py-4 sm:py-7">일련번호</th>
                     <th className="px-4 sm:px-10 py-4 sm:py-7">반품 사유</th>
@@ -738,10 +874,24 @@ const App: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {(filteredInventory as any[]).length === 0 ? (
-                    <tr><td colSpan={5} className="px-10 py-16 sm:py-24 text-center text-slate-300 font-black uppercase tracking-widest italic text-xl sm:text-2xl">반품된 내역이 없습니다</td></tr>
+                    <tr><td colSpan={6} className="px-10 py-16 sm:py-24 text-center text-slate-300 font-black uppercase tracking-widest italic text-xl sm:text-2xl">반품된 내역이 없습니다</td></tr>
                   ) : (
                     (filteredInventory as any[]).map(({ item, transaction }) => (
                       <tr key={transaction.id} className={`hover:bg-indigo-50/30 transition-colors group ${transaction.isDiscarded ? 'bg-rose-50/30' : ''}`}>
+                        <td className="px-4 sm:px-10 py-4 sm:py-7 text-center select-none">
+                          <input 
+                            type="checkbox"
+                            className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            checked={selectedReturnIds.includes(transaction.id)}
+                            onChange={() => {
+                              setSelectedReturnIds(prev => 
+                                prev.includes(transaction.id)
+                                  ? prev.filter(id => id !== transaction.id)
+                                  : [...prev, transaction.id]
+                              );
+                            }}
+                          />
+                        </td>
                         <td className="px-4 sm:px-10 py-4 sm:py-7">
                           <p className={`font-black text-slate-800 text-sm sm:text-lg ${transaction.isDiscarded ? 'line-through text-rose-400 decoration-rose-500 decoration-2' : ''}`}>{item.name}</p>
                           <p className="text-[10px] font-mono text-indigo-600 font-bold">{item.code}</p>

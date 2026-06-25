@@ -79,11 +79,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [transEditData, setTransEditData] = useState<Partial<Transaction>>({});
-  const [showPasswordInput, setShowPasswordInput] = useState<{ type: 'item' | 'trans_save' | 'trans_delete'; targetId?: string; } | null>(null);
+  const [showPasswordInput, setShowPasswordInput] = useState<{ type: 'item' | 'trans_save' | 'trans_delete' | 'batch_delete'; targetId?: string; } | null>(null);
   const [password, setPassword] = useState('');
   const [editFormData, setEditFormData] = useState<Partial<Item>>({});
+  const [selectedTransIds, setSelectedTransIds] = useState<string[]>([]);
   
-  const [showReturnModal, setShowReturnModal] = useState<{ itemId: string, transactionId: string } | null>(null);
+  const [showReturnModal, setShowReturnModal] = useState<{ itemId: string, transactionId?: string, transactionIds?: string[] } | null>(null);
   const [returnReason, setReturnReason] = useState('도장불량');
   const [returnRemarks, setReturnRemarks] = useState('');
 
@@ -264,6 +265,29 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
     else if (currentAction?.type === 'trans_save' && currentAction.targetId) onUpdateTransaction(item.id, currentAction.targetId, transEditData), setEditingTransactionId(null);
     else if (currentAction?.type === 'trans_delete' && currentAction.targetId) onDeleteTransaction(item.id, currentAction.targetId);
+    else if (currentAction?.type === 'batch_delete') {
+      selectedTransIds.forEach(id => {
+        onDeleteTransaction(item.id, id);
+      });
+      setSelectedTransIds([]);
+      alert(`${selectedTransIds.length}건의 품목들이 일괄 삭제되었습니다.`);
+    }
+  };
+
+  const handleToggleSelectTrans = (transId: string) => {
+    setSelectedTransIds(prev => 
+      prev.includes(transId) ? prev.filter(id => id !== transId) : [...prev, transId]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedTransIds.length === 0) {
+      alert('삭제할 품목을 선택해주세요.');
+      return;
+    }
+    if (confirm(`선택한 ${selectedTransIds.length}개 내역을 일괄 삭제하시겠습니까?`)) {
+      setShowPasswordInput({ type: 'batch_delete' });
+    }
   };
 
   const handleToggleEdit = () => {
@@ -303,17 +327,34 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const handleReturnSubmit = () => {
     if (showReturnModal) {
       const reason = returnReason === '기타' ? `기타: ${returnRemarks}` : returnReason;
-      const currentTrans = item.transactions.find(t => t.id === showReturnModal.transactionId);
-      const newRemarks = currentTrans?.remarks ? `${currentTrans.remarks} / 반품: ${reason}` : `반품: ${reason}`;
       
-      onUpdateTransaction(showReturnModal.itemId, showReturnModal.transactionId, {
-        isReturned: true,
-        returnReason: reason,
-        remarks: newRemarks
-      });
+      if (showReturnModal.transactionIds && showReturnModal.transactionIds.length > 0) {
+        showReturnModal.transactionIds.forEach(tId => {
+          const currentTrans = item.transactions.find(t => t.id === tId);
+          if (currentTrans) {
+            const newRemarks = currentTrans.remarks ? `${currentTrans.remarks} / 반품: ${reason}` : `반품: ${reason}`;
+            onUpdateTransaction(showReturnModal.itemId, tId, {
+              isReturned: true,
+              returnReason: reason,
+              remarks: newRemarks
+            });
+          }
+        });
+        setSelectedTransIds([]);
+        alert(`${showReturnModal.transactionIds.length}건이 일괄 반품 보관함으로 이동되었습니다.`);
+      } else if (showReturnModal.transactionId) {
+        const currentTrans = item.transactions.find(t => t.id === showReturnModal.transactionId);
+        const newRemarks = currentTrans?.remarks ? `${currentTrans.remarks} / 반품: ${reason}` : `반품: ${reason}`;
+        
+        onUpdateTransaction(showReturnModal.itemId, showReturnModal.transactionId, {
+          isReturned: true,
+          returnReason: reason,
+          remarks: newRemarks
+        });
+        alert('반품 보관함으로 이동되었습니다.');
+      }
       setShowReturnModal(null);
       setReturnRemarks('');
-      alert('반품 보관함으로 이동되었습니다.');
     }
   };
 
@@ -549,7 +590,44 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <button onClick={exportHistoryToExcel} className="hidden sm:flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-xl text-xs font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-sm">
                 <DownloadIcon className="w-4 h-4" /><span>내역 내보내기</span></button>
             </div>
-            <div className="flex-grow border-2 border-slate-100 rounded-2xl sm:rounded-[2rem] overflow-hidden bg-slate-50/50 flex flex-col h-full">
+            <div className="flex-grow border-2 border-slate-100 rounded-2xl sm:rounded-[2rem] overflow-hidden bg-slate-50/50 flex flex-col h-full relative">
+                {selectedTransIds.length > 0 && (
+                  <div className="bg-indigo-50 border-b border-indigo-100 px-4 py-3 flex items-center justify-between text-xs sm:text-sm animate-fade-in z-20">
+                    <span className="font-black text-indigo-800">
+                      선택됨: <span className="text-sm sm:text-base text-indigo-600 font-extrabold">{selectedTransIds.length}</span>개 품목
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const releaseTransIds = selectedTransIds.filter(id => {
+                            const found = item.transactions.find(trans => trans.id === id);
+                            return found && found.type === 'release' && !found.isReturned;
+                          });
+                          if (releaseTransIds.length === 0) {
+                            alert('반품이 가능한 출고(출고 상태이고 반품되지 않은) 내역이 선택되지 않았습니다.');
+                            return;
+                          }
+                          setShowReturnModal({ itemId: item.id, transactionIds: releaseTransIds });
+                        }}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-black text-[10px] sm:text-xs transition-colors shadow-sm cursor-pointer"
+                      >
+                        일괄 반품
+                      </button>
+                      <button
+                        onClick={handleBatchDelete}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-black text-[10px] sm:text-xs transition-colors shadow-sm cursor-pointer"
+                      >
+                        일괄 삭제
+                      </button>
+                      <button
+                        onClick={() => setSelectedTransIds([])}
+                        className="px-2.5 py-1.5 bg-white text-slate-500 border border-slate-200 hover:bg-slate-100 rounded-lg font-black text-[10px] sm:text-xs transition-colors cursor-pointer"
+                      >
+                        선택 해제
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="h-full overflow-y-auto custom-scrollbar">
                     {filteredHistory.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full p-10 opacity-20">
@@ -582,7 +660,15 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                     <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''} ${t.isReturned ? 'bg-amber-50/30' : ''}`}>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4">
                                           <div className="flex items-center gap-2 sm:gap-3">
-                                            <div className={`p-1 sm:p-1.5 rounded-lg ${t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                            <div 
+                                              onClick={() => handleToggleSelectTrans(t.id)}
+                                              className={`p-1.5 sm:p-2 rounded-lg cursor-pointer transition-all duration-200 transform active:scale-95 hover:scale-105 select-none ${
+                                                selectedTransIds.includes(t.id)
+                                                  ? (t.type === 'purchase' ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300' : 'bg-rose-600 text-white shadow-md ring-2 ring-rose-300')
+                                                  : (t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-rose-100 text-rose-600 hover:bg-rose-200')
+                                              }`}
+                                              title="선택하려면 클릭하세요"
+                                            >
                                               {t.type === 'purchase' ? <ArrowUpIcon className="w-3 h-3 sm:w-4 sm:h-4"/> : <ArrowDownIcon className="w-3 h-3 sm:w-4 sm:h-4"/>}
                                             </div>
                                             {editingTransactionId === t.id && authRole === 'admin' ? (
