@@ -129,14 +129,18 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const purchaseSum = useMemo(() => {
     return item.transactions
-      .filter(t => t.type === 'purchase' && !t.isDiscarded)
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && (!t.customerName || (t.customerName.trim() !== '대천공장' && t.customerName.trim() !== '대천폐기')))
       .reduce((acc, t) => acc + t.quantity, 0);
   }, [item.transactions]);
 
   const releaseSum = useMemo(() => {
-    return item.transactions
+    const totalRelease = item.transactions
       .filter(t => t.type === 'release' && !t.isDiscarded)
       .reduce((acc, t) => acc + t.quantity, 0);
+    const daecheonASReturn = item.transactions
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천공장')
+      .reduce((acc, t) => acc + t.quantity, 0);
+    return Math.max(0, totalRelease - daecheonASReturn);
   }, [item.transactions]);
 
   const saleSum = useMemo(() => {
