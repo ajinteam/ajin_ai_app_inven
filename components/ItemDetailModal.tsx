@@ -664,17 +664,32 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                     <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''} ${t.isReturned ? 'bg-amber-50/30' : ''}`}>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4">
                                           <div className="flex items-center gap-2 sm:gap-3">
-                                            <div 
-                                              onClick={() => handleToggleSelectTrans(t.id)}
-                                              className={`p-1.5 sm:p-2 rounded-lg cursor-pointer transition-all duration-200 transform active:scale-95 hover:scale-105 select-none ${
-                                                selectedTransIds.includes(t.id)
-                                                  ? (t.type === 'purchase' ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300' : 'bg-rose-600 text-white shadow-md ring-2 ring-rose-300')
-                                                  : (t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-rose-100 text-rose-600 hover:bg-rose-200')
-                                              }`}
-                                              title="선택하려면 클릭하세요"
-                                            >
-                                              {t.type === 'purchase' ? <ArrowUpIcon className="w-3 h-3 sm:w-4 sm:h-4"/> : <ArrowDownIcon className="w-3 h-3 sm:w-4 sm:h-4"/>}
-                                            </div>
+                                            {editingTransactionId === t.id && authRole === 'admin' ? (
+                                              <select
+                                                name="type"
+                                                value={transEditData.type || 'purchase'}
+                                                onChange={(e) => {
+                                                  const val = e.target.value as 'purchase' | 'release';
+                                                  setTransEditData(prev => ({ ...prev, type: val }));
+                                                }}
+                                                className="px-1 py-0.5 border-2 border-indigo-200 rounded-lg bg-white font-extrabold text-[10px] text-slate-700 outline-none focus:border-indigo-500 cursor-pointer"
+                                              >
+                                                <option value="purchase">입고</option>
+                                                <option value="release">출고</option>
+                                              </select>
+                                            ) : (
+                                              <div 
+                                                onClick={() => handleToggleSelectTrans(t.id)}
+                                                className={`p-1.5 sm:p-2 rounded-lg cursor-pointer transition-all duration-200 transform active:scale-95 hover:scale-105 select-none ${
+                                                  selectedTransIds.includes(t.id)
+                                                    ? (t.type === 'purchase' ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300' : 'bg-rose-600 text-white shadow-md ring-2 ring-rose-300')
+                                                    : (t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-rose-100 text-rose-600 hover:bg-rose-200')
+                                                }`}
+                                                title="선택하려면 클릭하세요"
+                                              >
+                                                {t.type === 'purchase' ? <ArrowUpIcon className="w-3 h-3 sm:w-4 sm:h-4"/> : <ArrowDownIcon className="w-3 h-3 sm:w-4 sm:h-4"/>}
+                                              </div>
+                                            )}
                                             {editingTransactionId === t.id && authRole === 'admin' ? (
                                               <input
                                                 type="datetime-local"
