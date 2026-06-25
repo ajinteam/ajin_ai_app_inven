@@ -129,7 +129,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const purchaseSum = useMemo(() => {
     return item.transactions
-      .filter(t => t.type === 'purchase' && !t.isDiscarded && (!t.customerName || (t.customerName.trim() !== '대천공장' && t.customerName.trim() !== '대천폐기')))
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && (!t.customerName || t.customerName.trim() !== '대천공장'))
       .reduce((acc, t) => acc + t.quantity, 0);
   }, [item.transactions]);
 
