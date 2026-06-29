@@ -17,6 +17,7 @@ export default function DateSalesSearchModal({
 }: DateSalesSearchModalProps) {
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [activeBrand, setActiveBrand] = useState<'ALL' | 'GiL' | 'KATO' | 'TOMIX'>('ALL');
+  const [selectedBuyerFilter, setSelectedBuyerFilter] = useState<string>('ALL');
 
   // Parse transaction date to local YYYY-MM-DD
   const getLocalDateString = (isoOrStr: string) => {
@@ -61,13 +62,52 @@ export default function DateSalesSearchModal({
     return list.sort((a, b) => new Date(b.transaction.date).getTime() - new Date(a.transaction.date).getTime());
   }, [items, selectedDate]);
 
-  // Filter by active brand/category (GiL, KATO, TOMIX)
+  // Filter by active brand/category and selected buyer
   const filteredSales = useMemo(() => {
-    if (activeBrand === 'ALL') return salesOnDate;
-    return salesOnDate.filter(
-      (sale) => sale.item.category?.toUpperCase() === activeBrand.toUpperCase()
-    );
+    let list = salesOnDate;
+    if (activeBrand !== 'ALL') {
+      list = list.filter(
+        (sale) => sale.item.category?.toUpperCase() === activeBrand.toUpperCase()
+      );
+    }
+    if (selectedBuyerFilter !== 'ALL') {
+      list = list.filter(
+        (sale) => sale.transaction.customerName?.trim() === selectedBuyerFilter
+      );
+    }
+    return list;
+  }, [salesOnDate, activeBrand, selectedBuyerFilter]);
+
+  // List all unique buyers for the brand under selected date (before applying buyer filter itself)
+  const allBuyers = useMemo(() => {
+    const baseList = activeBrand === 'ALL'
+      ? salesOnDate
+      : salesOnDate.filter(
+          (sale) => sale.item.category?.toUpperCase() === activeBrand.toUpperCase()
+        );
+    const buyers = baseList
+      .map((s) => s.transaction.customerName?.trim())
+      .filter(Boolean) as string[];
+    return Array.from(new Set(buyers)).sort();
   }, [salesOnDate, activeBrand]);
+
+  const uniqueBuyersCount = useMemo(() => {
+    const names = filteredSales
+      .map((s) => s.transaction.customerName?.trim())
+      .filter(Boolean);
+    return new Set(names).size;
+  }, [filteredSales]);
+
+  const codeQuantities = useMemo(() => {
+    const map: { [code: string]: number } = {};
+    filteredSales.forEach(({ item, transaction }) => {
+      const code = item.code || 'UNKNOWN';
+      map[code] = (map[code] || 0) + transaction.quantity;
+    });
+    return Object.entries(map)
+      .map(([code, qty]) => ({ code, qty }))
+      .sort((a, b) => b.qty - a.qty);
+  }, [filteredSales]);
 
   const totalQuantity = useMemo(() => {
     return filteredSales.reduce((sum, s) => sum + s.transaction.quantity, 0);
@@ -158,31 +198,63 @@ export default function DateSalesSearchModal({
         <div className="flex-grow overflow-hidden flex flex-col p-6 sm:p-10 bg-slate-50/30">
           {/* Summary */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-4 divide-x divide-slate-100">
-              <div>
+            <div className="flex flex-wrap items-center gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+              <div className="pr-4">
                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">조회 일자</span>
                 <p className="text-sm sm:text-lg font-black text-slate-700">{selectedDate || '미지정'}</p>
               </div>
-              <div className="pl-4">
+              <div className="sm:pl-4 pr-4">
                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">브랜드 필터</span>
                 <p className="text-sm sm:text-lg font-black text-slate-700">{activeBrand === 'ALL' ? '전체' : activeBrand}</p>
               </div>
-              <div className="pl-4">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">총 판매 수량</span>
-                <p className="text-sm sm:text-lg font-black text-indigo-600">{totalQuantity.toLocaleString()} EA ({filteredSales.length}건)</p>
+              <div className="sm:pl-4 pt-2 sm:pt-0">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">총 판매 수량</span>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className="text-sm sm:text-lg font-black text-indigo-600 whitespace-nowrap">
+                    {totalQuantity.toLocaleString()} EA ({uniqueBuyersCount}명)
+                  </p>
+                  {codeQuantities.length > 0 && (
+                    <div className="flex flex-wrap gap-1 items-center ml-2 border-l border-slate-200 pl-3">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">코드별 수량:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {codeQuantities.map(({ code, qty }) => (
+                          <span key={code} className="inline-flex items-center px-2 py-0.5 bg-slate-50 border border-slate-100 text-slate-700 rounded text-[9px] font-black">
+                            <span className="text-indigo-600 mr-1">{code}</span>
+                            <span>{qty}EA</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {filteredSales.length > 0 && (
               <button
                 onClick={handleExportExcel}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-black rounded-xl shadow-md hover:bg-emerald-700 text-xs sm:text-sm uppercase tracking-widest transition-all"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-black rounded-xl shadow-md hover:bg-emerald-700 text-xs sm:text-sm uppercase tracking-widest transition-all shrink-0"
               >
                 <DownloadIcon className="w-4 h-4" />
                 <span>엑셀 파일 저장</span>
               </button>
             )}
           </div>
+
+          {/* Active Filters Info */}
+          {selectedBuyerFilter !== 'ALL' && (
+            <div className="mb-4 flex items-center gap-2 bg-indigo-50 border border-indigo-100/50 px-4 py-2 rounded-xl animate-fade-in">
+              <span className="text-xs font-black text-indigo-800 flex items-center gap-1.5">
+                👤 {selectedBuyerFilter} 구매자의 내역만 조회 중입니다.
+              </span>
+              <button
+                onClick={() => setSelectedBuyerFilter('ALL')}
+                className="ml-auto text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2 py-1 rounded-md transition-all shadow-sm"
+              >
+                필터 해제 (전체 보기)
+              </button>
+            </div>
+          )}
 
           {/* Table Container */}
           <div className="flex-grow border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col">
@@ -194,7 +266,21 @@ export default function DateSalesSearchModal({
                     <th className="px-6 py-4">브랜드</th>
                     <th className="px-6 py-4">품명 (제품명)</th>
                     <th className="px-6 py-4">일련번호</th>
-                    <th className="px-6 py-4">구매자 (대상)</th>
+                    <th className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span>구매자 (대상)</span>
+                        <select
+                          value={selectedBuyerFilter}
+                          onChange={(e) => setSelectedBuyerFilter(e.target.value)}
+                          className="px-2 py-1 border-2 border-slate-200/80 bg-white text-slate-700 rounded-lg text-[10px] font-black tracking-normal uppercase focus:outline-none focus:border-indigo-500 cursor-pointer max-w-[130px] truncate shadow-sm transition-all hover:border-indigo-300"
+                        >
+                          <option value="ALL">👤 전체 구매자</option>
+                          {allBuyers.map(buyer => (
+                            <option key={buyer} value={buyer}>{buyer}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </th>
                     <th className="px-6 py-4 text-right">수량</th>
                   </tr>
                 </thead>
@@ -227,7 +313,21 @@ export default function DateSalesSearchModal({
                           {transaction.serialNumber || '-'}
                         </td>
                         <td className="px-6 py-4 font-black text-slate-700 text-xs sm:text-sm">
-                          {transaction.customerName || '-'}
+                          {transaction.customerName ? (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedBuyerFilter(transaction.customerName?.trim() || 'ALL')}
+                              className="text-left hover:text-indigo-600 hover:underline cursor-pointer transition-all flex items-center gap-1.5 group/btn bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 px-2.5 py-1 rounded-lg"
+                              title={`${transaction.customerName} 구매자만 필터링`}
+                            >
+                              <span className="font-extrabold">{transaction.customerName}</span>
+                              <span className="text-[8px] sm:text-[9px] text-slate-400 group-hover/btn:text-indigo-600 font-bold bg-white px-1 py-0.5 rounded border border-slate-100/50">
+                                필터 [A]
+                              </span>
+                            </button>
+                          ) : (
+                            '-'
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right font-black text-sm sm:text-base text-slate-900">
                           {transaction.quantity.toLocaleString()}{' '}
