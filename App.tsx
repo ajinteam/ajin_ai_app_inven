@@ -6,7 +6,43 @@ import ItemDetailModal from './components/ItemDetailModal';
 import ProductReleaseModal from './components/ProductReleaseModal';
 import BuyerSearchModal from './components/BuyerSearchModal';
 import UserManagementModal from './components/UserManagementModal';
+import DateSalesSearchModal from './components/DateSalesSearchModal';
 import { PlusIcon, BoxIcon, SearchIcon, TrashIcon, DownloadIcon, CloudIcon, ServerIcon, SyncIcon, ArrowDownIcon } from './components/icons';
+
+const detectDateInSearch = (text: string): string | null => {
+  const clean = text.trim();
+  // 1. YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+  // 2. YYYYMMDD
+  if (/^\d{8}$/.test(clean)) {
+    return `${clean.substring(0, 4)}-${clean.substring(4, 6)}-${clean.substring(6, 8)}`;
+  }
+  // 3. YYYY.MM.DD
+  if (/^\d{4}\.\d{2}\.\d{2}$/.test(clean)) {
+    return clean.replace(/\./g, '-');
+  }
+  // 4. YYYY/MM/DD
+  if (/^\d{4}\/\d{2}\/\d{2}$/.test(clean)) {
+    return clean.replace(/\//g, '-');
+  }
+  // 5. YY-MM-DD
+  if (/^\d{2}-\d{2}-\d{2}$/.test(clean)) {
+    return `20${clean}`;
+  }
+  // 6. YYMMDD
+  if (/^\d{6}$/.test(clean)) {
+    return `20${clean.substring(0, 2)}-${clean.substring(2, 4)}-${clean.substring(4, 6)}`;
+  }
+  // 7. YY.MM.DD
+  if (/^\d{2}\.\d{2}\.\d{2}$/.test(clean)) {
+    return `20${clean.replace(/\./g, '-')}`;
+  }
+  // 8. YY/MM/DD
+  if (/^\d{2}\/\d{2}\/\d{2}$/.test(clean)) {
+    return `20${clean.replace(/\//g, '-')}`;
+  }
+  return null;
+};
 
 const STORAGE_KEY = 'inventory_system_data_v2';
 const USERS_STORAGE_KEY = 'inventory_system_users_v2';
@@ -43,6 +79,12 @@ const App: React.FC = () => {
   
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showDateSalesModal, setShowDateSalesModal] = useState(false);
+  const [salesSearchDate, setSalesSearchDate] = useState('');
+
+  const detectedDate = useMemo(() => {
+    return detectDateInSearch(searchTerm);
+  }, [searchTerm]);
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'inventory'} | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
 
@@ -787,6 +829,24 @@ const App: React.FC = () => {
                   placeholder="품명, 코드, 일련번호, 대상자, 아이디 검색..."
                   className="w-full pl-11 sm:pl-14 pr-4 sm:pr-6 py-3 sm:py-4 border-2 border-slate-100 rounded-xl sm:rounded-2xl focus:outline-none focus:border-indigo-400 bg-white shadow-sm font-bold text-base sm:text-lg transition-all"
               />
+              {detectedDate && (
+                <div className="absolute left-0 right-0 top-full mt-2 bg-indigo-50 border border-indigo-100 rounded-xl p-3 shadow-lg z-30 flex items-center justify-between animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-black text-indigo-800">
+                      📅 입력하신 날짜 <span className="text-indigo-600 font-extrabold underline">{detectedDate}</span>의 판매(출고) 내역을 새창으로 조회하시겠습니까?
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSalesSearchDate(detectedDate);
+                      setShowDateSalesModal(true);
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-black text-xs sm:text-sm transition-all"
+                  >
+                    새창으로 보기
+                  </button>
+                </div>
+              )}
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
             <button onClick={exportToExcel} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-4 bg-emerald-600 text-white font-black rounded-lg sm:rounded-xl shadow-lg hover:bg-emerald-700 text-xs sm:text-sm uppercase tracking-widest">
@@ -796,6 +856,19 @@ const App: React.FC = () => {
             </button>
             {activeTab === 'product' && (
               <>
+                <button
+                  onClick={() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    setSalesSearchDate(detectedDate || todayStr);
+                    setShowDateSalesModal(true);
+                  }}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-4 bg-sky-600 text-white font-black rounded-lg sm:rounded-xl shadow-xl hover:bg-sky-700 text-xs sm:text-sm uppercase tracking-widest transition-all"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 sm:w-5 sm:h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                  </svg>
+                  <span>날짜별 판매 조회</span>
+                </button>
                 <button onClick={() => setShowBuyerSearchModal(true)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-4 bg-violet-600 text-white font-black rounded-lg sm:rounded-xl shadow-xl hover:bg-violet-700 text-xs sm:text-sm uppercase tracking-widest">
                   <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span>구매자 검색</span>
@@ -1133,6 +1206,14 @@ const App: React.FC = () => {
           users={users}
           onUpdateUsers={(updatedUsers) => setUsers(updatedUsers)}
           onClose={() => setShowUserManagementModal(false)}
+        />
+      )}
+      {showDateSalesModal && (
+        <DateSalesSearchModal
+          isOpen={showDateSalesModal}
+          onClose={() => setShowDateSalesModal(false)}
+          initialDate={salesSearchDate}
+          items={items}
         />
       )}
       {selectedItemId && selectedItem && (
