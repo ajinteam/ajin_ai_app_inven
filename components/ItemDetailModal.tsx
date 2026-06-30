@@ -19,22 +19,22 @@ interface ItemDetailModalProps {
 const ADMIN_PASSWORD = '5200';
 const PRODUCT_ONLY_PASSWORD = '2611';
 
-const suggestNextSerial = (usedSerials: string[]): string => {
-  if (usedSerials.length === 0) return 'AJP00001';
-  const regex = /^([a-zA-Z]+)(\d+)$/;
+const suggestNextSerial = (usedSerials: string[], prefix: string = 'AJP'): string => {
+  const filteredSerials = usedSerials.filter(s => s.toUpperCase().startsWith(prefix.toUpperCase()));
+  if (filteredSerials.length === 0) return `${prefix}00001`;
+  
+  const regex = new RegExp(`^${prefix}(\\d+)$`, 'i');
   let maxNum = 0;
-  let currentPrefix = 'AJP';
-  usedSerials.forEach(s => {
-    const match = s.toUpperCase().match(regex);
+  filteredSerials.forEach(s => {
+    const match = s.match(regex);
     if (match) {
-      currentPrefix = match[1];
-      const num = parseInt(match[2], 10);
+      const num = parseInt(match[1], 10);
       if (num > maxNum) maxNum = num;
     }
   });
   const nextNum = maxNum + 1;
   const padLength = Math.max(5, nextNum.toString().length);
-  return `${currentPrefix}${nextNum.toString().padStart(padLength, '0')}`;
+  return `${prefix}${nextNum.toString().padStart(padLength, '0')}`;
 };
 
 const parseSerialRange = (input: string): string[] => {
@@ -97,8 +97,21 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   useEffect(() => {
-    if (item.type === 'product' && !serialNumber) setSerialNumber(suggestNextSerial(allUsedSerials));
-  }, [item, allUsedSerials]);
+    if (item.type === 'product' && !serialNumber) {
+      if (item.category === 'GiL') {
+        const code = item.code?.toUpperCase() || '';
+        if (code.startsWith('P')) {
+          setSerialNumber(suggestNextSerial(allUsedSerials, 'AJP'));
+        } else if (code.startsWith('D')) {
+          setSerialNumber(suggestNextSerial(allUsedSerials, 'AJD'));
+        } else {
+          setSerialNumber('');
+        }
+      } else {
+        setSerialNumber('');
+      }
+    }
+  }, [item, allUsedSerials, serialNumber]);
 
   useEffect(() => {
     setEditFormData({

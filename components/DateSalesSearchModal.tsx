@@ -195,7 +195,7 @@ export default function DateSalesSearchModal({
         </div>
 
         {/* Content Body */}
-        <div className="flex-grow overflow-hidden flex flex-col p-6 sm:p-10 bg-slate-50/30">
+        <div className="flex-grow overflow-y-auto md:overflow-hidden flex flex-col p-4 sm:p-10 bg-slate-50/30">
           {/* Summary */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm">
             <div className="flex flex-wrap items-center gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
@@ -233,7 +233,7 @@ export default function DateSalesSearchModal({
             {filteredSales.length > 0 && (
               <button
                 onClick={handleExportExcel}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-black rounded-xl shadow-md hover:bg-emerald-700 text-xs sm:text-sm uppercase tracking-widest transition-all shrink-0"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-black rounded-xl shadow-md hover:bg-emerald-700 text-xs sm:text-sm uppercase tracking-widest transition-all shrink-0 w-full sm:w-auto"
               >
                 <DownloadIcon className="w-4 h-4" />
                 <span>엑셀 파일 저장</span>
@@ -256,8 +256,72 @@ export default function DateSalesSearchModal({
             </div>
           )}
 
-          {/* Table Container */}
-          <div className="flex-grow border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col">
+          {/* Mobile List View (only on small screens) */}
+          <div className="block md:hidden flex-grow overflow-y-auto space-y-3 pr-1 scrollbar-hide">
+            {filteredSales.length === 0 ? (
+              <div className="py-20 text-center text-slate-300 font-black uppercase tracking-widest italic text-sm">
+                해당 조건의 판매 데이터가 존재하지 않습니다
+              </div>
+            ) : (
+              filteredSales.map(({ item, transaction }) => (
+                <div key={transaction.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase tracking-wider border border-indigo-100">
+                        {item.category || '-'}
+                      </span>
+                      <p className="font-black text-slate-800 text-xs sm:text-sm mt-1.5 leading-snug">{item.name}</p>
+                      <p className="text-[9px] font-mono text-slate-400 font-bold mt-0.5">{item.code}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-mono font-bold text-slate-400 block">
+                        {getLocalDateString(transaction.date)}
+                      </span>
+                      <span className="text-[9px] text-slate-400 block mt-0.5">
+                        {new Date(transaction.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-2.5 border-t border-slate-50 text-xs">
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">일련번호</span>
+                      <span className="font-mono font-black text-indigo-600">
+                        {transaction.serialNumber || '-'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">수량</span>
+                      <span className="font-black text-slate-800 text-sm">
+                        {transaction.quantity.toLocaleString()} EA
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 border-t border-slate-50 flex items-center justify-between text-xs">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">구매자 (대상)</span>
+                    {transaction.customerName ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBuyerFilter(transaction.customerName?.trim() || 'ALL')}
+                        className="hover:text-indigo-600 hover:underline cursor-pointer transition-all flex items-center gap-1.5 group/btn bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 px-2 py-1 rounded-lg"
+                      >
+                        <span className="font-extrabold text-slate-700">{transaction.customerName}</span>
+                        <span className="text-[8px] text-indigo-600 font-black bg-white px-1 py-0.5 rounded border border-slate-100/50">
+                          필터 [A]
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="text-slate-400 font-bold">-</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Table Container (Large Screens) */}
+          <div className="hidden md:flex flex-col flex-grow border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm">
             <div className="overflow-x-auto overflow-y-auto flex-grow scrollbar-hide">
               <table className="w-full text-left min-w-[700px] border-collapse">
                 <thead className="text-[10px] sm:text-xs text-slate-400 uppercase bg-slate-50/50 border-b border-slate-100 font-black tracking-wider sm:tracking-[0.15em] sticky top-0 z-10">

@@ -70,19 +70,24 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
 
   const filteredProducts = useMemo(() => items.filter(i => i.category === brand), [items, brand]);
 
-  // Serial Number Logic for Brands
+  // Serial Number Logic for Selected Product & Brand
   useEffect(() => {
     const pendingSerials = releaseList.map(r => r.serial.toUpperCase());
-    if (brand === 'GiL') {
-      // Find the next available AJP serial
-      setSerial(suggestNextSerial([...allUsedSerials, ...pendingSerials], 'AJP'));
-    } else if (brand === 'KATO' || brand === 'TOMIX') {
-      // Find the next available G serial for KATO and TOMIX
-      setSerial(suggestNextSerial([...allUsedSerials, ...pendingSerials], 'G'));
+    const product = items.find(i => i.id === selectedProductId);
+
+    if (brand === 'GiL' && product) {
+      const code = product.code?.toUpperCase() || '';
+      if (code.startsWith('P')) {
+        setSerial(suggestNextSerial([...allUsedSerials, ...pendingSerials], 'AJP'));
+      } else if (code.startsWith('D')) {
+        setSerial(suggestNextSerial([...allUsedSerials, ...pendingSerials], 'AJD'));
+      } else {
+        setSerial('');
+      }
     } else {
       setSerial('');
     }
-  }, [brand, releaseList, allUsedSerials]);
+  }, [brand, selectedProductId, releaseList, allUsedSerials, items]);
 
   // Handle Serial Range to Quantity conversion
   useEffect(() => {
