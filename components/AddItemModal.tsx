@@ -163,19 +163,23 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
                   </div>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            <div className={`grid grid-cols-1 ${itemType === 'product' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4 sm:gap-6`}>
               <div>
                 <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">초기 수량</label>
                 <input type="number" name="initialQuantity" min="0" value={formData.initialQuantity} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
               </div>
               <div>
-                <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">일반 단가 (원)</label>
+                <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">
+                  {itemType === 'product' ? '일반 단가 (원)' : '단가 (원)'}
+                </label>
                 <input type="number" name="unitPrice" min="0" value={formData.unitPrice} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
               </div>
-              <div>
-                <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">대리점용 단가 (원)</label>
-                <input type="number" name="agencyPrice" min="0" value={formData.agencyPrice || '0'} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
-              </div>
+              {itemType === 'product' && (
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">대리점용 단가 (원)</label>
+                  <input type="number" name="agencyPrice" min="0" value={formData.agencyPrice || '0'} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">비고</label>

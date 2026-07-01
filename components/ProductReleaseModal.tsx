@@ -380,7 +380,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                       <th className="px-4 py-3">브랜드</th>
                       <th className="px-4 py-3">제품명</th>
                       <th className="px-4 py-3">수량</th>
-                      <th className="px-4 py-3">단가 / 금액</th>
+                      <th className="px-4 py-3">단가</th>
                       <th className="px-4 py-3">일련번호</th>
                       <th className="px-4 py-3">작업</th>
                     </tr>
@@ -395,7 +395,6 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                           <div className="flex flex-col">
                             <span className="text-slate-700">{(r.unitPrice || 0).toLocaleString()}원</span>
                             <span className="text-[9px] text-slate-400">({r.priceType === 'agency' ? '대리점' : '일반'})</span>
-                            <span className="text-[10px] text-indigo-600 font-extrabold">{((r.unitPrice || 0) * r.quantity).toLocaleString()}원</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 font-mono font-black text-indigo-600">{r.serial || '-'}</td>

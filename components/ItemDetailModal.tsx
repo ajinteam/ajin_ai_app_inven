@@ -604,9 +604,30 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </>
                     )}
                     {showPrice && (
-                      <div className="grid grid-cols-2 gap-4">
+                      item.type === 'product' ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">일반 단가 (원)</label>
+                            <input 
+                              type="number" 
+                              value={editFormData.unitPrice !== undefined ? editFormData.unitPrice : ''} 
+                              onChange={(e) => setEditFormData({...editFormData, unitPrice: parseInt(e.target.value, 10) || 0})} 
+                              className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">대리점용 단가 (원)</label>
+                            <input 
+                              type="number" 
+                              value={editFormData.agencyPrice !== undefined ? editFormData.agencyPrice : ''} 
+                              onChange={(e) => setEditFormData({...editFormData, agencyPrice: parseInt(e.target.value, 10) || 0})} 
+                              className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" 
+                            />
+                          </div>
+                        </div>
+                      ) : (
                         <div>
-                          <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">일반 단가 (원)</label>
+                          <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">단가 (원)</label>
                           <input 
                             type="number" 
                             value={editFormData.unitPrice !== undefined ? editFormData.unitPrice : ''} 
@@ -614,16 +635,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                             className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" 
                           />
                         </div>
-                        <div>
-                          <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">대리점용 단가 (원)</label>
-                          <input 
-                            type="number" 
-                            value={editFormData.agencyPrice !== undefined ? editFormData.agencyPrice : ''} 
-                            onChange={(e) => setEditFormData({...editFormData, agencyPrice: parseInt(e.target.value, 10) || 0})} 
-                            className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" 
-                          />
-                        </div>
-                      </div>
+                      )
                     )}
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">비고</label>
                     <textarea name="remarks" value={editFormData.remarks || ''} onChange={(e) => setEditFormData({...editFormData, remarks: e.target.value})} rows={2} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 rounded-xl text-base sm:text-lg font-bold" /></div>
@@ -644,20 +656,29 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     )}
                     <div className="flex justify-between pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Reg Date</span><span className="font-bold text-slate-500">{item.registrationDate}</span></div>
                     {showPrice && (
-                      <>
-                        <div className="flex justify-between border-t border-slate-100 pt-2 pb-1">
-                          <span className="text-slate-400 font-black uppercase text-[10px]">일반 단가</span>
-                          <span className="font-bold text-slate-800">{(item.unitPrice || 0).toLocaleString()}원</span>
-                        </div>
-                        <div className="flex justify-between pb-1">
-                          <span className="text-slate-400 font-black uppercase text-[10px]">대리점 단가</span>
-                          <span className="font-bold text-slate-800">{(item.agencyPrice || 0).toLocaleString()}원</span>
-                        </div>
-                        <div className="flex justify-between pb-2">
-                          <span className="text-slate-400 font-black uppercase text-[10px]">Total Sales Amount</span>
-                          <span className="font-extrabold text-indigo-600">{totalSalesAmount.toLocaleString()}원</span>
-                        </div>
-                      </>
+                      item.type === 'product' ? (
+                        <>
+                          <div className="flex justify-between border-t border-slate-100 pt-2 pb-1">
+                            <span className="text-slate-400 font-black uppercase text-[10px]">일반 단가</span>
+                            <span className="font-bold text-slate-800">{(item.unitPrice || 0).toLocaleString()}원</span>
+                          </div>
+                          <div className="flex justify-between pb-1">
+                            <span className="text-slate-400 font-black uppercase text-[10px]">대리점 단가</span>
+                            <span className="font-bold text-slate-800">{(item.agencyPrice || 0).toLocaleString()}원</span>
+                          </div>
+                          <div className="flex justify-between pb-2">
+                            <span className="text-slate-400 font-black uppercase text-[10px]">Total Sales Amount</span>
+                            <span className="font-extrabold text-indigo-600">{totalSalesAmount.toLocaleString()}원</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between border-t border-slate-100 pt-2 pb-2">
+                            <span className="text-slate-400 font-black uppercase text-[10px]">단가</span>
+                            <span className="font-bold text-slate-800">{(item.unitPrice || 0).toLocaleString()}원</span>
+                          </div>
+                        </>
+                      )
                     )}
                     {item.remarks && (<div className="mt-4 p-4 bg-white rounded-xl border border-slate-100 text-slate-600 font-bold leading-relaxed italic text-sm whitespace-pre-wrap break-all">"{item.remarks}"</div>)}
                   </div>

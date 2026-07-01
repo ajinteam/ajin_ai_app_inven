@@ -12,11 +12,11 @@ interface BuyerSearchModalProps {
 const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, showPrice = false }) => {
   const [nameTerm, setNameTerm] = useState('');
   const [dateTerm, setDateTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'flat' | 'grouped'>('flat');
+  const [viewMode, setViewMode] = useState<'flat' | 'grouped' | 'byCode'>('flat');
 
   // Extract all release transactions from all products
   const allReleases = useMemo(() => {
-    const releases: (Transaction & { itemName: string, itemBrand: string, unitPrice: number })[] = [];
+    const releases: (Transaction & { itemName: string, itemBrand: string, itemCode: string, unitPrice: number })[] = [];
     items.forEach(item => {
       item.transactions.forEach(t => {
         if (t.type === 'release') {
@@ -24,7 +24,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             ...t,
             itemName: item.name,
             itemBrand: item.category || '-',
-            unitPrice: item.unitPrice || 0
+            itemCode: item.code || '',
+            unitPrice: t.unitPrice !== undefined ? t.unitPrice : (item.unitPrice || 0)
           });
         }
       });
@@ -78,6 +79,27 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
         return { date, list, amount, qty };
       })
       .sort((a, b) => b.date.localeCompare(a.date));
+  }, [filteredReleases]);
+
+  const groupedByCode = useMemo(() => {
+    const groups: { [codeStr: string]: typeof filteredReleases } = {};
+    filteredReleases.forEach(r => {
+      const codeStr = r.itemCode || 'UNKNOWN';
+      if (!groups[codeStr]) {
+        groups[codeStr] = [];
+      }
+      groups[codeStr].push(r);
+    });
+    
+    return Object.entries(groups)
+      .map(([code, list]) => {
+        const amount = list.reduce((sum, r) => sum + (r.quantity * (r.unitPrice || 0)), 0);
+        const qty = list.reduce((sum, r) => sum + r.quantity, 0);
+        const name = list[0]?.itemName || '';
+        const brand = list[0]?.itemBrand || '-';
+        return { code, name, brand, list, amount, qty };
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
   }, [filteredReleases]);
 
   const handleExport = () => {
@@ -178,6 +200,13 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 >
                   날짜별 그룹화
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('byCode')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${viewMode === 'byCode' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                >
+                  코드별 그룹화
+                </button>
               </div>
               <button 
                 onClick={handleExport}
@@ -244,7 +273,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   </table>
                 </div>
               </div>
-            ) : (
+            ) : viewMode === 'grouped' ? (
               <div className="space-y-6">
                 {groupedByDate.map((group) => (
                   <div key={group.date} className="bg-white border border-slate-100 rounded-[1.5rem] p-5 sm:p-6 shadow-md space-y-4">
@@ -286,6 +315,71 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                             <tr key={r.id || idx} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-4 py-3 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
                               <td className="px-4 py-3 font-black text-slate-800">{r.itemName}</td>
+                              <td className="px-4 py-3 font-mono font-black text-indigo-400">{r.serialNumber || '-'}</td>
+                              {showPrice && (
+                                <td className="px-4 py-3 text-right text-slate-500 font-bold">
+                                  {(r.unitPrice || 0).toLocaleString()}원
+                                </td>
+                              )}
+                              {showPrice && (
+                                <td className="px-4 py-3 text-right text-emerald-600 font-black">
+                                  {(r.quantity * (r.unitPrice || 0)).toLocaleString()}원
+                                </td>
+                              )}
+                              <td className="px-4 py-3 text-right font-black text-slate-900">{r.quantity} EA</td>
+                              <td className="px-4 py-3">
+                                <p className="font-black text-slate-900 text-xs">{r.customerName || '-'}</p>
+                                {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                              </td>
+                              <td className="px-4 py-3 text-slate-400 font-medium max-w-[150px] truncate" title={r.remarks}>{r.remarks || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {groupedByCode.map((group) => (
+                  <div key={group.code} className="bg-white border border-slate-100 rounded-[1.5rem] p-5 sm:p-6 shadow-md space-y-4">
+                    {/* Group Header */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-100 gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-xl font-mono font-black text-xs sm:text-sm">
+                          [{group.code}] {group.name}
+                        </span>
+                        <span className="text-slate-400 text-xs font-bold">
+                          ({group.brand}, {group.list.length}건, 총 {group.qty.toLocaleString()} EA)
+                        </span>
+                      </div>
+                      {showPrice && (
+                        <div className="text-sm font-black">
+                          <span className="text-slate-400 text-xs uppercase mr-2">매출 금액:</span>
+                          <span className="text-emerald-600 text-base font-extrabold">{group.amount.toLocaleString()}원</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Group Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs sm:text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-black uppercase tracking-wider">
+                          <tr>
+                            <th className="px-4 py-3">날짜</th>
+                            <th className="px-4 py-3">일련번호</th>
+                            {showPrice && <th className="px-4 py-3 text-right">단가</th>}
+                            {showPrice && <th className="px-4 py-3 text-right">금액</th>}
+                            <th className="px-4 py-3 text-right">수량</th>
+                            <th className="px-4 py-3">대상자 / 아이디</th>
+                            <th className="px-4 py-3">비고</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {group.list.map((r, idx) => (
+                            <tr key={r.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 font-bold text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
                               <td className="px-4 py-3 font-mono font-black text-indigo-400">{r.serialNumber || '-'}</td>
                               {showPrice && (
                                 <td className="px-4 py-3 text-right text-slate-500 font-bold">
