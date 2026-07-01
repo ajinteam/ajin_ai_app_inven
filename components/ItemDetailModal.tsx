@@ -106,6 +106,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [password, setPassword] = useState('');
   const [editFormData, setEditFormData] = useState<Partial<Item>>({});
   const [selectedTransIds, setSelectedTransIds] = useState<string[]>([]);
+  const [priceType, setPriceType] = useState<'general' | 'agency'>('general');
   
   const [showReturnModal, setShowReturnModal] = useState<{ itemId: string, transactionId?: string, transactionIds?: string[] } | null>(null);
   const [returnReason, setReturnReason] = useState('도장불량');
@@ -139,10 +140,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   }, [item, allUsedSerials, serialNumber, transactionType]);
 
   useEffect(() => {
+    setPriceType('general');
     setEditFormData({
       name: item.name, code: item.code, modelName: item.modelName, application: item.application,
       drawingNumber: item.drawingNumber, spec: item.spec || '', remarks: item.remarks, registrationDate: item.registrationDate,
-      category: item.category, unitPrice: item.unitPrice
+      category: item.category, unitPrice: item.unitPrice, agencyPrice: item.agencyPrice
     });
   }, [item]);
 
@@ -214,6 +216,15 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       .filter(t => t.type === 'release' && !t.isDiscarded && (!t.customerName || (t.customerName.trim() !== '대천' && t.customerName.trim() !== '대천공장')))
       .reduce((acc, t) => acc + t.quantity, 0);
   }, [item.transactions]);
+
+  const totalSalesAmount = useMemo(() => {
+    return item.transactions
+      .filter(t => t.type === 'release' && !t.isDiscarded && (!t.customerName || (t.customerName.trim() !== '대천' && t.customerName.trim() !== '대천공장')))
+      .reduce((sum, t) => {
+        const price = t.unitPrice !== undefined ? t.unitPrice : (item.unitPrice || 0);
+        return sum + (t.quantity * price);
+      }, 0);
+  }, [item.transactions, item.unitPrice]);
 
   const returnASSum = useMemo(() => {
     return item.transactions
@@ -294,12 +305,15 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     
     if (isRange) {
       const baseTime = Date.now();
+      const currentPrice = priceType === 'general' ? (item.unitPrice || 0) : (item.agencyPrice || 0);
       if (onAddTransactions) {
         const batch: Omit<Transaction, 'id'>[] = targetSerials.map((s, index) => ({
           type: transactionType, quantity: 1, 
           date: new Date(baseTime + index).toISOString(), 
           remarks: transRemarks, modelName: transModelName, userId: transUserId, 
-          serialNumber: s, customerName, address, phoneNumber 
+          serialNumber: s, customerName, address, phoneNumber,
+          priceType: priceType,
+          unitPrice: currentPrice
         }));
         onAddTransactions(item.id, batch);
       } else {
@@ -307,18 +321,23 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           type: transactionType, quantity: 1, 
           date: new Date(baseTime + index).toISOString(), 
           remarks: transRemarks, modelName: transModelName, userId: transUserId, 
-          serialNumber: s, customerName, address, phoneNumber 
+          serialNumber: s, customerName, address, phoneNumber,
+          priceType: priceType,
+          unitPrice: currentPrice
         }));
       }
       alert(`${targetSerials.length}건이 일련번호 기반으로 개별 등록되었습니다.`);
     } else {
+      const currentPrice = priceType === 'general' ? (item.unitPrice || 0) : (item.agencyPrice || 0);
       onAddTransaction(item.id, { 
         type: transactionType, quantity: count, date: new Date().toISOString(), 
         remarks: transRemarks, modelName: transModelName, userId: transUserId, 
         serialNumber: (!isPurchase && item.type === 'product') ? serialNumber.toUpperCase() : '', 
-        customerName: (!isPurchase && item.type === 'product') ? customerName : '', 
-        address: (!isPurchase && item.type === 'product') ? address : '', 
-        phoneNumber: (!isPurchase && item.type === 'product') ? phoneNumber : '' 
+        customerName: (item.type === 'product') ? customerName : '', 
+        address: (item.type === 'product') ? address : '', 
+        phoneNumber: (item.type === 'product') ? phoneNumber : '',
+        priceType: (!isPurchase && item.type === 'product') ? priceType : undefined,
+        unitPrice: (!isPurchase && item.type === 'product') ? currentPrice : undefined
       });
     }
     
@@ -330,10 +349,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setCustomerName(''); 
     setAddress(''); 
     setPhoneNumber('');
+    setPriceType('general');
   };
   
   const handleActionConfirm = () => {
-    const requiredPass = authRole === 'admin' ? '5200' : '2611' ;
+    const requiredPass = authRole === 'admin' ? 'aj5200' : '2611' ;
     if (password !== requiredPass) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
@@ -584,14 +604,25 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </>
                     )}
                     {showPrice && (
-                      <div>
-                        <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">단가 (원)</label>
-                        <input 
-                          type="number" 
-                          value={editFormData.unitPrice !== undefined ? editFormData.unitPrice : ''} 
-                          onChange={(e) => setEditFormData({...editFormData, unitPrice: parseInt(e.target.value, 10) || 0})} 
-                          className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" 
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">일반 단가 (원)</label>
+                          <input 
+                            type="number" 
+                            value={editFormData.unitPrice !== undefined ? editFormData.unitPrice : ''} 
+                            onChange={(e) => setEditFormData({...editFormData, unitPrice: parseInt(e.target.value, 10) || 0})} 
+                            className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">대리점용 단가 (원)</label>
+                          <input 
+                            type="number" 
+                            value={editFormData.agencyPrice !== undefined ? editFormData.agencyPrice : ''} 
+                            onChange={(e) => setEditFormData({...editFormData, agencyPrice: parseInt(e.target.value, 10) || 0})} 
+                            className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" 
+                          />
+                        </div>
                       </div>
                     )}
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">비고</label>
@@ -615,12 +646,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     {showPrice && (
                       <>
                         <div className="flex justify-between border-t border-slate-100 pt-2 pb-1">
-                          <span className="text-slate-400 font-black uppercase text-[10px]">Unit Price</span>
+                          <span className="text-slate-400 font-black uppercase text-[10px]">일반 단가</span>
                           <span className="font-bold text-slate-800">{(item.unitPrice || 0).toLocaleString()}원</span>
+                        </div>
+                        <div className="flex justify-between pb-1">
+                          <span className="text-slate-400 font-black uppercase text-[10px]">대리점 단가</span>
+                          <span className="font-bold text-slate-800">{(item.agencyPrice || 0).toLocaleString()}원</span>
                         </div>
                         <div className="flex justify-between pb-2">
                           <span className="text-slate-400 font-black uppercase text-[10px]">Total Sales Amount</span>
-                          <span className="font-extrabold text-indigo-600">{(saleSum * (item.unitPrice || 0)).toLocaleString()}원</span>
+                          <span className="font-extrabold text-indigo-600">{totalSalesAmount.toLocaleString()}원</span>
                         </div>
                       </>
                     )}
@@ -645,6 +680,24 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                         {item.type === 'product' ? (
                           transactionType === 'release' ? (
                             <>
+                              {showPrice && (
+                                <div className="flex p-1 bg-slate-100 rounded-xl text-xs font-black">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPriceType('general')}
+                                    className={`flex-1 py-1.5 sm:py-2 rounded-lg transition-all ${priceType === 'general' ? 'bg-white text-indigo-600 shadow-sm font-black' : 'text-slate-400'}`}
+                                  >
+                                    일반: {(item.unitPrice || 0).toLocaleString()}원
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPriceType('agency')}
+                                    className={`flex-1 py-1.5 sm:py-2 rounded-lg transition-all ${priceType === 'agency' ? 'bg-white text-indigo-600 shadow-sm font-black' : 'text-slate-400'}`}
+                                  >
+                                    대리점용: {(item.agencyPrice || 0).toLocaleString()}원
+                                  </button>
+                                </div>
+                              )}
                               <div className="relative">
                                   <div className="flex justify-between items-center mb-1.5">
                                     <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest">일련번호 (범위: SN001~010)</label>
@@ -816,9 +869,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                           {editingTransactionId === t.id ? (
                                             <input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-16 sm:w-20 px-2 py-1 border-2 rounded-lg bg-white font-black text-xs sm:text-base" />
                                           ) : (
-                                            <span className={`font-black text-sm sm:text-lg ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'} ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
-                                              {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
-                                            </span>
+                                            <div className="flex flex-col">
+                                              <span className={`font-black text-sm sm:text-lg ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'} ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
+                                                {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
+                                              </span>
+                                              {showPrice && t.type === 'release' && (
+                                                <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-500 whitespace-nowrap">
+                                                  {((t.unitPrice !== undefined ? t.unitPrice : (item.unitPrice || 0)) * t.quantity).toLocaleString()}원
+                                                  <span className="text-[8px] text-slate-400 font-bold ml-1">
+                                                    ({t.priceType === 'agency' ? '대리점' : '일반'})
+                                                  </span>
+                                                </span>
+                                              )}
+                                            </div>
                                           )}
                                         </td>
                                         {item.type === 'part' && (

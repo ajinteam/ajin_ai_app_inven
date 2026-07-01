@@ -88,7 +88,8 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
   const [itemRemarks, setItemRemarks] = useState('');
 
   // Pending List
-  const [releaseList, setReleaseList] = useState<{ itemId: string, name: string, brand: string, quantity: number, serial: string, remarks: string }[]>([]);
+  const [releaseList, setReleaseList] = useState<{ itemId: string, name: string, brand: string, quantity: number, serial: string, remarks: string, priceType?: 'general' | 'agency', unitPrice?: number }[]>([]);
+  const [priceType, setPriceType] = useState<'general' | 'agency'>('general');
 
   const filteredProducts = useMemo(() => items.filter(i => i.category === brand), [items, brand]);
 
@@ -151,10 +152,16 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
     }
   }, [quantity]);
 
+  const selectedProduct = useMemo(() => items.find(i => i.id === selectedProductId), [items, selectedProductId]);
+
+  useEffect(() => {
+    setPriceType('general');
+  }, [selectedProductId]);
+
   const handleAddToList = () => {
     if (!selectedProductId) { alert('제품을 선택하세요.'); return; }
     
-    const product = items.find(i => i.id === selectedProductId);
+    const product = selectedProduct;
     if (!product) return;
 
     let targetSerials: string[] = [serial.toUpperCase().trim()];
@@ -179,6 +186,8 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
       return; 
     }
 
+    const currentPrice = priceType === 'general' ? (product.unitPrice || 0) : (product.agencyPrice || 0);
+
     if (isRange) {
       const newEntries = targetSerials.map(s => ({
         itemId: selectedProductId,
@@ -186,7 +195,9 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
         brand: brand,
         quantity: 1,
         serial: s,
-        remarks: itemRemarks
+        remarks: itemRemarks,
+        priceType: priceType,
+        unitPrice: currentPrice
       }));
       setReleaseList(prev => [...prev, ...newEntries]);
     } else {
@@ -196,13 +207,16 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
         brand: brand,
         quantity: qty,
         serial: serial.toUpperCase(),
-        remarks: itemRemarks
+        remarks: itemRemarks,
+        priceType: priceType,
+        unitPrice: currentPrice
       }]);
     }
 
     // Reset selection part
     setQuantity('1');
     setItemRemarks('');
+    setPriceType('general');
   };
 
   const handleRemoveFromList = (index: number) => {
@@ -229,7 +243,9 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
           customerName: customerInfo.name,
           userId: customerInfo.userId, // Allow lowercase as is
           phoneNumber: customerInfo.phone,
-          address: customerInfo.address
+          address: customerInfo.address,
+          priceType: r.priceType,
+          unitPrice: r.unitPrice
         }
       };
     });
@@ -300,6 +316,36 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                 </select>
               </div>
 
+              {selectedProduct && (
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center animate-fade-in">
+                  <label className="w-24 text-xs font-black text-slate-400 uppercase">단가 구분</label>
+                  <div className="flex gap-2 w-full">
+                    <button
+                      type="button"
+                      onClick={() => setPriceType('general')}
+                      className={`flex-1 py-2 sm:py-3 rounded-xl text-xs font-black border-2 transition-all ${
+                        priceType === 'general'
+                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                          : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
+                      }`}
+                    >
+                      일반: {(selectedProduct.unitPrice || 0).toLocaleString()}원
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPriceType('agency')}
+                      className={`flex-1 py-2 sm:py-3 rounded-xl text-xs font-black border-2 transition-all ${
+                        priceType === 'agency'
+                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                          : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
+                      }`}
+                    >
+                      대리점용: {(selectedProduct.agencyPrice || 0).toLocaleString()}원
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
                   <label className="w-24 text-xs font-black text-slate-400 uppercase">수량</label>
@@ -334,6 +380,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                       <th className="px-4 py-3">브랜드</th>
                       <th className="px-4 py-3">제품명</th>
                       <th className="px-4 py-3">수량</th>
+                      <th className="px-4 py-3">단가 / 금액</th>
                       <th className="px-4 py-3">일련번호</th>
                       <th className="px-4 py-3">작업</th>
                     </tr>
@@ -344,6 +391,13 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                         <td className="px-4 py-3 font-black text-indigo-600">{r.brand}</td>
                         <td className="px-4 py-3 font-bold text-slate-700">{r.name}</td>
                         <td className="px-4 py-3 font-black">{r.quantity} EA</td>
+                        <td className="px-4 py-3 font-bold">
+                          <div className="flex flex-col">
+                            <span className="text-slate-700">{(r.unitPrice || 0).toLocaleString()}원</span>
+                            <span className="text-[9px] text-slate-400">({r.priceType === 'agency' ? '대리점' : '일반'})</span>
+                            <span className="text-[10px] text-indigo-600 font-extrabold">{((r.unitPrice || 0) * r.quantity).toLocaleString()}원</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-3 font-mono font-black text-indigo-600">{r.serial || '-'}</td>
                         <td className="px-4 py-3">
                           <button onClick={() => handleRemoveFromList(i)} className="p-2 text-rose-400 hover:bg-rose-50 rounded-lg"><TrashIcon className="w-4 h-4" /></button>

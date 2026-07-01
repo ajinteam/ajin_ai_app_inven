@@ -22,7 +22,8 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
     spec: '',
     remarks: '',
     initialQuantity: '0',
-    unitPrice: '0'
+    unitPrice: '0',
+    agencyPrice: '0'
   });
 
   useEffect(() => {
@@ -70,16 +71,18 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
       alert('이미 사용 중인 코드입니다. 코드를 변경해주세요.');
       return;
     }
-    const { initialQuantity, unitPrice, ...rest } = formData;
+    const { initialQuantity, unitPrice, agencyPrice, ...rest } = formData;
     const quantity = parseInt(initialQuantity, 10) || 0;
     const price = parseInt(unitPrice, 10) || 0;
+    const aPrice = parseInt(agencyPrice, 10) || 0;
     onAddItem({
       ...rest,
       type: itemType,
       category: itemType === 'product' ? productCategory : undefined,
       modelName: '',
       application: '',
-      unitPrice: price
+      unitPrice: price,
+      agencyPrice: aPrice
     }, quantity);
     onClose();
   };
@@ -160,14 +163,18 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
                   </div>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               <div>
                 <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">초기 수량</label>
                 <input type="number" name="initialQuantity" min="0" value={formData.initialQuantity} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
               </div>
               <div>
-                <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">단가 (원)</label>
+                <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">일반 단가 (원)</label>
                 <input type="number" name="unitPrice" min="0" value={formData.unitPrice} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">대리점용 단가 (원)</label>
+                <input type="number" name="agencyPrice" min="0" value={formData.agencyPrice || '0'} onChange={handleChange} className="w-full px-4 py-2 sm:py-3 border-2 border-slate-100 rounded-xl text-sm sm:text-lg focus:ring-2 focus:ring-indigo-500 outline-none font-black" />
               </div>
             </div>
             <div>

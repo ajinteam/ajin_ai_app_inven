@@ -46,7 +46,7 @@ const detectDateInSearch = (text: string): string | null => {
 
 const STORAGE_KEY = 'inventory_system_data_v2';
 const USERS_STORAGE_KEY = 'inventory_system_users_v2';
-const ADMIN_PASSWORD = '5200';
+const ADMIN_PASSWORD = 'aj5200';
 const PRODUCT_ONLY_PASSWORD = '2611';
 
 let idCounter = 0;
