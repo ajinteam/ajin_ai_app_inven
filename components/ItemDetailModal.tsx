@@ -119,7 +119,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   useEffect(() => {
-    if (item.type === 'product' && !serialNumber) {
+    if (transactionType === 'purchase') {
+      setSerialNumber('');
+    } else if (item.type === 'product' && !serialNumber) {
       if (item.category === 'GiL') {
         const code = item.code?.toUpperCase() || '';
         if (code.startsWith('P')) {
@@ -133,7 +135,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         setSerialNumber('');
       }
     }
-  }, [item, allUsedSerials, serialNumber]);
+  }, [item, allUsedSerials, serialNumber, transactionType]);
 
   useEffect(() => {
     setEditFormData({
@@ -145,7 +147,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   // Handle two-way sync between Serial Range and Quantity
   useEffect(() => {
-    if (item.type !== 'product') return;
+    if (item.type !== 'product' || transactionType !== 'release') return;
     const trimmedSerial = serialNumber.trim();
     if (trimmedSerial.includes('~')) {
       try {
@@ -172,10 +174,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         }
       }
     }
-  }, [serialNumber, item.type]);
+  }, [serialNumber, item.type, transactionType]);
 
   useEffect(() => {
-    if (item.type !== 'product') return;
+    if (item.type !== 'product' || transactionType !== 'release') return;
     const qty = parseInt(quantity, 10);
     if (!isNaN(qty) && qty > 0) {
       const expectedSerial = generateSerialRange(serialNumber, qty);
@@ -183,7 +185,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         setSerialNumber(expectedSerial);
       }
     }
-  }, [quantity, item.type]);
+  }, [quantity, item.type, transactionType]);
 
   const currentStock = useMemo(() => item.transactions.reduce((acc, t) => {
     if (t.isDiscarded) return acc;
@@ -266,9 +268,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
-    let targetSerials: string[] = [serialNumber.toUpperCase().trim()];
+    const isPurchase = transactionType === 'purchase';
+    
+    let targetSerials: string[] = isPurchase ? [] : [serialNumber.toUpperCase().trim()];
     let isRange = false;
-    if (item.type === 'product' && serialNumber.includes('~')) {
+    if (!isPurchase && item.type === 'product' && serialNumber.includes('~')) {
       try { 
         targetSerials = parseSerialRange(serialNumber.toUpperCase()); 
         isRange = true; 
@@ -278,8 +282,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       }
     }
     
-    const duplicates = targetSerials.filter(s => !!s && allUsedSerials.includes(s));
-    if (duplicates.length > 0) { alert(`중복 번호 존재: ${duplicates.slice(0, 5).join(', ')}...`); return; }
+    if (!isPurchase) {
+      const duplicates = targetSerials.filter(s => !!s && allUsedSerials.includes(s));
+      if (duplicates.length > 0) { alert(`중복 번호 존재: ${duplicates.slice(0, 5).join(', ')}...`); return; }
+    }
     
     const count = isRange ? targetSerials.length : (parseInt(quantity, 10) || 0);
     if (count <= 0) { alert('수량을 확인하세요.'); return; }
@@ -308,10 +314,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       onAddTransaction(item.id, { 
         type: transactionType, quantity: count, date: new Date().toISOString(), 
         remarks: transRemarks, modelName: transModelName, userId: transUserId, 
-        serialNumber: item.type === 'product' ? serialNumber.toUpperCase() : '', 
-        customerName: item.type === 'product' ? customerName : '', 
-        address: item.type === 'product' ? address : '', 
-        phoneNumber: item.type === 'product' ? phoneNumber : '' 
+        serialNumber: (!isPurchase && item.type === 'product') ? serialNumber.toUpperCase() : '', 
+        customerName: (!isPurchase && item.type === 'product') ? customerName : '', 
+        address: (!isPurchase && item.type === 'product') ? address : '', 
+        phoneNumber: (!isPurchase && item.type === 'product') ? phoneNumber : '' 
       });
     }
     
@@ -319,7 +325,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setTransRemarks(''); 
     setTransModelName(''); 
     setTransUserId(''); 
-    setSerialNumber(suggestNextSerial([...allUsedSerials, ...targetSerials])); 
+    setSerialNumber(isPurchase ? '' : suggestNextSerial([...allUsedSerials, ...targetSerials])); 
     setCustomerName(''); 
     setAddress(''); 
     setPhoneNumber('');
@@ -607,24 +613,31 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </div>
                       <div className="space-y-3 sm:space-y-4">
                         {item.type === 'product' ? (
-                          <>
+                          transactionType === 'release' ? (
+                            <>
+                              <div className="relative">
+                                  <div className="flex justify-between items-center mb-1.5">
+                                    <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest">일련번호 (범위: SN001~010)</label>
+                                    <button type="button" onClick={() => setSerialNumber(suggestNextSerial(allUsedSerials))} className="text-[8px] sm:text-[10px] font-black text-indigo-600 underline">제안</button>
+                                  </div>
+                                  <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="예: AJP00001~00005" className={`w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 rounded-xl font-black outline-none ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                  <div className="relative">
+                                    <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
+                                  </div>
+                                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                              </div>
+                              <input type="text" value={transUserId} onChange={(e) => setTransUserId(e.target.value)} placeholder="아이디" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                              <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                              <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="배송 주소" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                            </>
+                          ) : (
                             <div className="relative">
-                                <div className="flex justify-between items-center mb-1.5">
-                                  <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest">일련번호 (범위: SN001~010)</label>
-                                  <button type="button" onClick={() => setSerialNumber(suggestNextSerial(allUsedSerials))} className="text-[8px] sm:text-[10px] font-black text-indigo-600 underline">제안</button>
-                                </div>
-                                <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="예: AJP00001~00005" className={`w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 rounded-xl font-black outline-none ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
+                              <label className="block text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">입고 수량</label>
+                              <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
                             </div>
-                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                                <div className="relative">
-                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
-                                </div>
-                                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
-                            </div>
-                            <input type="text" value={transUserId} onChange={(e) => setTransUserId(e.target.value)} placeholder="아이디" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
-                            <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
-                            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="배송 주소" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
-                          </>
+                          )
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
