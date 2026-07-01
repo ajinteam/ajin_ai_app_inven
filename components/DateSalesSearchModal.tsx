@@ -52,6 +52,10 @@ export default function DateSalesSearchModal({
       item.transactions.forEach((t) => {
         // Sold transaction: type === 'release', not discarded, and not returned
         if (t.type === 'release' && !t.isDiscarded && !t.isReturned) {
+          const cust = (t.customerName || '').trim();
+          if (cust === '대천' || cust === '대천공장') {
+            return;
+          }
           const transDate = getLocalDateString(t.date);
           if (transDate === selectedDate) {
             list.push({ item, transaction: t });
@@ -104,7 +108,7 @@ export default function DateSalesSearchModal({
     const map: { [code: string]: { qty: number; amount: number } } = {};
     filteredSales.forEach(({ item, transaction }) => {
       const code = item.code || 'UNKNOWN';
-      const price = item.unitPrice || 0;
+      const price = transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0);
       if (!map[code]) {
         map[code] = { qty: 0, amount: 0 };
       }
@@ -118,14 +122,14 @@ export default function DateSalesSearchModal({
 
   const totalSalesAmountOnDate = useMemo(() => {
     return salesOnDate.reduce((sum, s) => {
-      const price = s.item.unitPrice || 0;
+      const price = s.transaction.unitPrice !== undefined ? s.transaction.unitPrice : (s.item.unitPrice || 0);
       return sum + (s.transaction.quantity * price);
     }, 0);
   }, [salesOnDate]);
 
   const filteredSalesAmount = useMemo(() => {
     return filteredSales.reduce((sum, s) => {
-      const price = s.item.unitPrice || 0;
+      const price = s.transaction.unitPrice !== undefined ? s.transaction.unitPrice : (s.item.unitPrice || 0);
       return sum + (s.transaction.quantity * price);
     }, 0);
   }, [filteredSales]);
@@ -167,7 +171,7 @@ export default function DateSalesSearchModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 animate-fade-in">
-      <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col h-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden border border-slate-100 animate-fade-in-up">
+      <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] flex flex-col h-full max-h-[92vh] overflow-hidden border border-slate-100 animate-fade-in-up">
         {/* Header */}
         <div className="px-6 sm:px-10 py-5 sm:py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3">

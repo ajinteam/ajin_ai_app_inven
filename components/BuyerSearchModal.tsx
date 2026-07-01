@@ -19,7 +19,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     const releases: (Transaction & { itemName: string, itemBrand: string, itemCode: string, unitPrice: number })[] = [];
     items.forEach(item => {
       item.transactions.forEach(t => {
-        if (t.type === 'release') {
+        if (t.type === 'release' && !t.isDiscarded && !t.isReturned) {
+          const cust = (t.customerName || '').trim();
+          if (cust === '대천' || cust === '대천공장') {
+            return;
+          }
           releases.push({
             ...t,
             itemName: item.name,
@@ -133,7 +137,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-6xl animate-fade-in-up flex flex-col h-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] animate-fade-in-up flex flex-col h-full max-h-[92vh] overflow-hidden">
         <div className="p-6 sm:p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">

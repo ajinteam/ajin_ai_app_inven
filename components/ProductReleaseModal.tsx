@@ -9,6 +9,7 @@ interface ProductReleaseModalProps {
   allUsedSerials: string[];
   onBatchRelease: (releases: { itemId: string, transaction: Omit<Transaction, 'id'> }[]) => void;
   onClose: () => void;
+  showPrice?: boolean;
 }
 
 const suggestNextSerial = (usedSerials: string[], prefix: string = 'AJP'): string => {
@@ -70,7 +71,7 @@ const generateSerialRange = (currentSerial: string, qty: number): string => {
   return `${prefix}${numStr}~${prefix}${endNumStr}`;
 };
 
-const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUsedSerials, onBatchRelease, onClose }) => {
+const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUsedSerials, onBatchRelease, onClose, showPrice = false }) => {
   // Master Customer Info
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
@@ -329,7 +330,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                           : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
                       }`}
                     >
-                      일반: {(selectedProduct.unitPrice || 0).toLocaleString()}원
+                      일반{showPrice ? `: ${(selectedProduct.unitPrice || 0).toLocaleString()}원` : ''}
                     </button>
                     <button
                       type="button"
@@ -340,7 +341,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                           : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
                       }`}
                     >
-                      대리점용: {(selectedProduct.agencyPrice || 0).toLocaleString()}원
+                      대리점용{showPrice ? `: ${(selectedProduct.agencyPrice || 0).toLocaleString()}원` : ''}
                     </button>
                   </div>
                 </div>
@@ -380,7 +381,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                       <th className="px-4 py-3">브랜드</th>
                       <th className="px-4 py-3">제품명</th>
                       <th className="px-4 py-3">수량</th>
-                      <th className="px-4 py-3">단가</th>
+                      <th className="px-4 py-3">{showPrice ? '단가' : '구분'}</th>
                       <th className="px-4 py-3">일련번호</th>
                       <th className="px-4 py-3">작업</th>
                     </tr>
@@ -393,8 +394,14 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                         <td className="px-4 py-3 font-black">{r.quantity} EA</td>
                         <td className="px-4 py-3 font-bold">
                           <div className="flex flex-col">
-                            <span className="text-slate-700">{(r.unitPrice || 0).toLocaleString()}원</span>
-                            <span className="text-[9px] text-slate-400">({r.priceType === 'agency' ? '대리점' : '일반'})</span>
+                            {showPrice ? (
+                              <>
+                                <span className="text-slate-700">{(r.unitPrice || 0).toLocaleString()}원</span>
+                                <span className="text-[9px] text-slate-400">({r.priceType === 'agency' ? '대리점' : '일반'})</span>
+                              </>
+                            ) : (
+                              <span className="text-slate-700">{r.priceType === 'agency' ? '대리점용' : '일반'}</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 font-mono font-black text-indigo-600">{r.serial || '-'}</td>

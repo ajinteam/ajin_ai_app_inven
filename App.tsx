@@ -1199,6 +1199,7 @@ const App: React.FC = () => {
           allUsedSerials={allUsedSerials} 
           onBatchRelease={handleBatchRelease} 
           onClose={() => setShowProductReleaseModal(false)} 
+          showPrice={showPrice}
         />
       )}
       {showBuyerSearchModal && (
