@@ -48,6 +48,28 @@ const parseSerialRange = (input: string): string[] => {
   return results;
 };
 
+const generateSerialRange = (currentSerial: string, qty: number): string => {
+  if (qty <= 0) return currentSerial;
+  const base = currentSerial.includes('~') ? currentSerial.split('~')[0].trim() : currentSerial.trim();
+  const match = base.match(/^(AJP|AJD)(\d+)$/i);
+  if (!match) return currentSerial;
+
+  const prefix = match[1].toUpperCase();
+  const numStr = match[2];
+  const startNum = parseInt(numStr, 10);
+  if (isNaN(startNum)) return currentSerial;
+
+  if (qty === 1) {
+    return `${prefix}${numStr}`;
+  }
+
+  const endNum = startNum + qty - 1;
+  const padLength = numStr.length;
+  const endNumStr = endNum.toString().padStart(padLength, '0');
+
+  return `${prefix}${numStr}~${prefix}${endNumStr}`;
+};
+
 const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUsedSerials, onBatchRelease, onClose }) => {
   // Master Customer Info
   const [customerInfo, setCustomerInfo] = useState({
@@ -89,19 +111,45 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
     }
   }, [brand, selectedProductId, releaseList, allUsedSerials, items]);
 
-  // Handle Serial Range to Quantity conversion
+  // Handle two-way sync between Serial Range and Quantity
   useEffect(() => {
-    if (serial.includes('~')) {
+    const trimmedSerial = serial.trim();
+    if (trimmedSerial.includes('~')) {
       try {
-        const range = parseSerialRange(serial.toUpperCase());
+        const range = parseSerialRange(trimmedSerial.toUpperCase());
         if (range.length > 1) {
-          setQuantity(range.length.toString());
+          const expectedQtyStr = range.length.toString();
+          if (quantity !== expectedQtyStr) {
+            setQuantity(expectedQtyStr);
+          }
         }
       } catch (e) {
         // Silent catch for invalid ranges
       }
+    } else {
+      // If it doesn't contain '~' but matches AJP/AJD format, and current quantity > 1, auto-expand it!
+      const match = trimmedSerial.match(/^(AJP|AJD)(\d+)$/i);
+      if (match) {
+        const qty = parseInt(quantity, 10);
+        if (!isNaN(qty) && qty > 1) {
+          const expectedSerial = generateSerialRange(trimmedSerial, qty);
+          if (serial !== expectedSerial) {
+            setSerial(expectedSerial);
+          }
+        }
+      }
     }
   }, [serial]);
+
+  useEffect(() => {
+    const qty = parseInt(quantity, 10);
+    if (!isNaN(qty) && qty > 0) {
+      const expectedSerial = generateSerialRange(serial, qty);
+      if (serial !== expectedSerial) {
+        setSerial(expectedSerial);
+      }
+    }
+  }, [quantity]);
 
   const handleAddToList = () => {
     if (!selectedProductId) { alert('제품을 선택하세요.'); return; }
@@ -255,7 +303,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
                   <label className="w-24 text-xs font-black text-slate-400 uppercase">수량</label>
-                  <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="1" disabled={serial.includes('~')} className={`flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400 ${serial.includes('~') ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`} />
+                  <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="1" className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400" />
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="w-24 text-xs font-black text-slate-400 uppercase">일련번호</label>

@@ -56,6 +56,28 @@ const parseSerialRange = (input: string): string[] => {
   return results;
 };
 
+const generateSerialRange = (currentSerial: string, qty: number): string => {
+  if (qty <= 0) return currentSerial;
+  const base = currentSerial.includes('~') ? currentSerial.split('~')[0].trim() : currentSerial.trim();
+  const match = base.match(/^(AJP|AJD)(\d+)$/i);
+  if (!match) return currentSerial;
+
+  const prefix = match[1].toUpperCase();
+  const numStr = match[2];
+  const startNum = parseInt(numStr, 10);
+  if (isNaN(startNum)) return currentSerial;
+
+  if (qty === 1) {
+    return `${prefix}${numStr}`;
+  }
+
+  const endNum = startNum + qty - 1;
+  const padLength = numStr.length;
+  const endNumStr = endNum.toString().padStart(padLength, '0');
+
+  return `${prefix}${numStr}~${prefix}${endNumStr}`;
+};
+
 const toLocalDatetimeString = (dateStr: string | number | undefined): string => {
   if (!dateStr) return '';
   const date = new Date(dateStr);
@@ -121,19 +143,47 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     });
   }, [item]);
 
-  // Handle Serial Range to Quantity conversion
+  // Handle two-way sync between Serial Range and Quantity
   useEffect(() => {
-    if (item.type === 'product' && serialNumber.includes('~')) {
+    if (item.type !== 'product') return;
+    const trimmedSerial = serialNumber.trim();
+    if (trimmedSerial.includes('~')) {
       try {
-        const range = parseSerialRange(serialNumber.toUpperCase());
+        const range = parseSerialRange(trimmedSerial.toUpperCase());
         if (range.length > 1) {
-          setQuantity(range.length.toString());
+          const expectedQtyStr = range.length.toString();
+          if (quantity !== expectedQtyStr) {
+            setQuantity(expectedQtyStr);
+          }
         }
       } catch (e) {
         // Silent catch for invalid ranges
       }
+    } else {
+      // If it doesn't contain '~' but matches AJP/AJD format, and current quantity > 1, auto-expand it!
+      const match = trimmedSerial.match(/^(AJP|AJD)(\d+)$/i);
+      if (match) {
+        const qty = parseInt(quantity, 10);
+        if (!isNaN(qty) && qty > 1) {
+          const expectedSerial = generateSerialRange(trimmedSerial, qty);
+          if (serialNumber !== expectedSerial) {
+            setSerialNumber(expectedSerial);
+          }
+        }
+      }
     }
   }, [serialNumber, item.type]);
+
+  useEffect(() => {
+    if (item.type !== 'product') return;
+    const qty = parseInt(quantity, 10);
+    if (!isNaN(qty) && qty > 0) {
+      const expectedSerial = generateSerialRange(serialNumber, qty);
+      if (serialNumber !== expectedSerial) {
+        setSerialNumber(expectedSerial);
+      }
+    }
+  }, [quantity, item.type]);
 
   const currentStock = useMemo(() => item.transactions.reduce((acc, t) => {
     if (t.isDiscarded) return acc;
@@ -567,7 +617,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                             </div>
                             <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                 <div className="relative">
-                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required disabled={serialNumber.includes('~')} className={`w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 rounded-xl font-black outline-none ${serialNumber.includes('~') ? 'bg-slate-100 text-slate-400 border-slate-200' : 'border-slate-100 focus:border-indigo-400'}`} />
+                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
                                 </div>
                                 <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                             </div>
