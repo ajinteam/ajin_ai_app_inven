@@ -29,6 +29,7 @@ export interface Item {
   drawingNumber: string; // 도번
   application: string; // 적용
   remarks: string; // 비고
+  unitPrice?: number; // 단가 추가
   transactions: Transaction[];
 }
 
@@ -49,4 +50,5 @@ export interface User {
   password: string;
   partPermission: 'read' | 'edit' | 'none';
   productPermission: 'read' | 'edit' | 'none';
+  showPricePermission?: boolean;
 }

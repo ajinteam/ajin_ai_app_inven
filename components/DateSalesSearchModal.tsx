@@ -7,6 +7,7 @@ interface DateSalesSearchModalProps {
   onClose: () => void;
   initialDate: string;
   items: Item[];
+  showPrice?: boolean;
 }
 
 export default function DateSalesSearchModal({
@@ -14,6 +15,7 @@ export default function DateSalesSearchModal({
   onClose,
   initialDate,
   items,
+  showPrice = false,
 }: DateSalesSearchModalProps) {
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [activeBrand, setActiveBrand] = useState<'ALL' | 'GiL' | 'KATO' | 'TOMIX'>('ALL');
@@ -98,15 +100,34 @@ export default function DateSalesSearchModal({
     return new Set(names).size;
   }, [filteredSales]);
 
-  const codeQuantities = useMemo(() => {
-    const map: { [code: string]: number } = {};
+  const codeSalesData = useMemo(() => {
+    const map: { [code: string]: { qty: number; amount: number } } = {};
     filteredSales.forEach(({ item, transaction }) => {
       const code = item.code || 'UNKNOWN';
-      map[code] = (map[code] || 0) + transaction.quantity;
+      const price = item.unitPrice || 0;
+      if (!map[code]) {
+        map[code] = { qty: 0, amount: 0 };
+      }
+      map[code].qty += transaction.quantity;
+      map[code].amount += transaction.quantity * price;
     });
     return Object.entries(map)
-      .map(([code, qty]) => ({ code, qty }))
+      .map(([code, data]) => ({ code, qty: data.qty, amount: data.amount }))
       .sort((a, b) => b.qty - a.qty);
+  }, [filteredSales]);
+
+  const totalSalesAmountOnDate = useMemo(() => {
+    return salesOnDate.reduce((sum, s) => {
+      const price = s.item.unitPrice || 0;
+      return sum + (s.transaction.quantity * price);
+    }, 0);
+  }, [salesOnDate]);
+
+  const filteredSalesAmount = useMemo(() => {
+    return filteredSales.reduce((sum, s) => {
+      const price = s.item.unitPrice || 0;
+      return sum + (s.transaction.quantity * price);
+    }, 0);
   }, [filteredSales]);
 
   const totalQuantity = useMemo(() => {
@@ -213,14 +234,14 @@ export default function DateSalesSearchModal({
                   <p className="text-sm sm:text-lg font-black text-indigo-600 whitespace-nowrap">
                     {totalQuantity.toLocaleString()} EA ({uniqueBuyersCount}명)
                   </p>
-                  {codeQuantities.length > 0 && (
+                  {codeSalesData.length > 0 && (
                     <div className="flex flex-wrap gap-1 items-center ml-2 border-l border-slate-200 pl-3">
-                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">코드별 수량:</span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{showPrice ? '코드별 판매 내역:' : '코드별 수량:'}</span>
                       <div className="flex flex-wrap gap-1">
-                        {codeQuantities.map(({ code, qty }) => (
+                        {codeSalesData.map(({ code, qty, amount }) => (
                           <span key={code} className="inline-flex items-center px-2 py-0.5 bg-slate-50 border border-slate-100 text-slate-700 rounded text-[9px] font-black">
                             <span className="text-indigo-600 mr-1">{code}</span>
-                            <span>{qty}EA</span>
+                            <span>{qty}EA{showPrice ? ` (${amount.toLocaleString()}원)` : ''}</span>
                           </span>
                         ))}
                       </div>
@@ -228,6 +249,22 @@ export default function DateSalesSearchModal({
                   )}
                 </div>
               </div>
+              {showPrice && (
+                <>
+                  <div className="sm:pl-4 pt-2 sm:pt-0">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">날짜별 총 판매금액</span>
+                    <p className="text-sm sm:text-lg font-black text-emerald-600 whitespace-nowrap">
+                      {totalSalesAmountOnDate.toLocaleString()} 원
+                    </p>
+                  </div>
+                  <div className="sm:pl-4 pt-2 sm:pt-0">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">필터/구매자 판매금액</span>
+                    <p className="text-sm sm:text-lg font-black text-sky-600 whitespace-nowrap">
+                      {filteredSalesAmount.toLocaleString()} 원
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             {filteredSales.length > 0 && (
@@ -298,6 +335,23 @@ export default function DateSalesSearchModal({
                     </div>
                   </div>
 
+                  {showPrice && (
+                    <div className="grid grid-cols-2 gap-4 pt-2.5 border-t border-slate-50 text-xs">
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">단가</span>
+                        <span className="font-black text-slate-700">
+                          {(item.unitPrice || 0).toLocaleString()} 원
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">금액</span>
+                        <span className="font-black text-emerald-600">
+                          {(transaction.quantity * (item.unitPrice || 0)).toLocaleString()} 원
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="pt-2.5 border-t border-slate-50 flex items-center justify-between text-xs">
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">구매자 (대상)</span>
                     {transaction.customerName ? (
@@ -345,13 +399,15 @@ export default function DateSalesSearchModal({
                         </select>
                       </div>
                     </th>
+                    {showPrice && <th className="px-6 py-4 text-right">단가</th>}
+                    {showPrice && <th className="px-6 py-4 text-right">금액</th>}
                     <th className="px-6 py-4 text-right">수량</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredSales.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-20 text-center text-slate-300 font-black uppercase tracking-widest italic text-base sm:text-xl">
+                      <td colSpan={showPrice ? 8 : 6} className="px-6 py-20 text-center text-slate-300 font-black uppercase tracking-widest italic text-base sm:text-xl">
                         해당 조건의 판매 데이터가 존재하지 않습니다
                       </td>
                     </tr>
@@ -393,6 +449,16 @@ export default function DateSalesSearchModal({
                             '-'
                           )}
                         </td>
+                        {showPrice && (
+                          <td className="px-6 py-4 text-right font-black text-xs sm:text-sm text-slate-600">
+                            {(item.unitPrice || 0).toLocaleString()}원
+                          </td>
+                        )}
+                        {showPrice && (
+                          <td className="px-6 py-4 text-right font-extrabold text-xs sm:text-sm text-emerald-600">
+                            {(transaction.quantity * (item.unitPrice || 0)).toLocaleString()}원
+                          </td>
+                        )}
                         <td className="px-6 py-4 text-right font-black text-sm sm:text-base text-slate-900">
                           {transaction.quantity.toLocaleString()}{' '}
                           <span className="text-[10px] uppercase text-slate-400 ml-0.5">EA</span>

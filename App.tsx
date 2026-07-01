@@ -616,6 +616,12 @@ const App: React.FC = () => {
 
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId), [items, selectedItemId]);
 
+  const showPrice = useMemo(() => {
+    if (authRole === 'admin') return true;
+    if (authRole === 'custom' && currentUser?.showPricePermission) return true;
+    return false;
+  }, [authRole, currentUser]);
+
   const filteredInventory = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     
@@ -1199,6 +1205,7 @@ const App: React.FC = () => {
         <BuyerSearchModal 
           items={items.filter(i => i.type === 'product')} 
           onClose={() => setShowBuyerSearchModal(false)} 
+          showPrice={showPrice}
         />
       )}
       {showUserManagementModal && (
@@ -1214,6 +1221,7 @@ const App: React.FC = () => {
           onClose={() => setShowDateSalesModal(false)}
           initialDate={salesSearchDate}
           items={items}
+          showPrice={showPrice}
         />
       )}
       {selectedItemId && selectedItem && (
@@ -1228,6 +1236,7 @@ const App: React.FC = () => {
           onDeleteTransaction={handleDeleteTransaction} 
           onUpdateItem={handleUpdateItem} 
           onClose={() => setSelectedItemId(null)} 
+          showPrice={showPrice}
         />
       )}
     </div>

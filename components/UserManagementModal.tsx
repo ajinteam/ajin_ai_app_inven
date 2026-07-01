@@ -18,7 +18,8 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
     name: '',
     password: '',
     partPermission: 'none',
-    productPermission: 'none'
+    productPermission: 'none',
+    showPricePermission: false
   });
 
   const handleAddUser = (e: React.FormEvent) => {
@@ -29,7 +30,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
     }
     const newUser: User = { ...formData, id: generateId() };
     onUpdateUsers([...users, newUser]);
-    setFormData({ name: '', password: '', partPermission: 'none', productPermission: 'none' });
+    setFormData({ name: '', password: '', partPermission: 'none', productPermission: 'none', showPricePermission: false });
   };
 
   const handleEditUser = (user: User) => {
@@ -38,7 +39,8 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
       name: user.name,
       password: user.password,
       partPermission: user.partPermission,
-      productPermission: user.productPermission
+      productPermission: user.productPermission,
+      showPricePermission: !!user.showPricePermission
     });
     // 스크롤을 폼 상단으로 이동 (편의성)
     const modalContent = document.getElementById('user-modal-content');
@@ -50,7 +52,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
     const updatedUsers = users.map(u => u.id === editingUserId ? { ...formData, id: editingUserId } : u);
     onUpdateUsers(updatedUsers);
     setEditingUserId(null);
-    setFormData({ name: '', password: '', partPermission: 'none', productPermission: 'none' });
+    setFormData({ name: '', password: '', partPermission: 'none', productPermission: 'none', showPricePermission: false });
   };
 
   const confirmDelete = () => {
@@ -123,7 +125,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">부품 재고 접근 권한</label>
                 <div className="flex gap-2">
@@ -160,13 +162,30 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
                   ))}
                 </div>
               </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">단가표시 접근 권한</label>
+                <div className="flex gap-2">
+                  {[
+                    { val: false, label: '권한없음' },
+                    { val: true, label: '단가표시' }
+                  ].map(p => (
+                    <button 
+                      key={p.label} type="button" 
+                      onClick={() => setFormData({...formData, showPricePermission: p.val})}
+                      className={`flex-1 py-2.5 text-[10px] font-black uppercase rounded-lg border-2 transition-all ${formData.showPricePermission === p.val ? 'bg-sky-600 border-sky-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-sky-100'}`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-2 pt-2">
               {editingUserId ? (
                 <>
                   <button onClick={handleSaveEdit} type="button" className="flex-1 py-4 bg-amber-600 text-white font-black rounded-xl uppercase tracking-widest text-xs shadow-lg hover:bg-amber-700">변경사항 저장</button>
-                  <button onClick={() => {setEditingUserId(null); setFormData({name:'', password:'', partPermission:'none', productPermission:'none'})}} type="button" className="flex-1 py-4 bg-slate-300 text-slate-600 font-black rounded-xl uppercase tracking-widest text-xs">취소</button>
+                  <button onClick={() => {setEditingUserId(null); setFormData({name:'', password:'', partPermission:'none', productPermission:'none', showPricePermission: false})}} type="button" className="flex-1 py-4 bg-slate-300 text-slate-600 font-black rounded-xl uppercase tracking-widest text-xs">취소</button>
                 </>
               ) : (
                 <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-black rounded-xl uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700 transition-all">
@@ -188,12 +207,13 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
                     <th className="px-6 py-5">로그인 번호</th>
                     <th className="px-6 py-5">부품 권한</th>
                     <th className="px-6 py-5">제품 권한</th>
+                    <th className="px-6 py-5">단가 표시</th>
                     <th className="px-6 py-5 text-center">관리</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {users.length === 0 ? (
-                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-300 font-bold italic uppercase">등록된 사용자가 없습니다</td></tr>
+                    <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-300 font-bold italic uppercase">등록된 사용자가 없습니다</td></tr>
                   ) : (
                     users.map(u => (
                       <tr key={u.id} className={`hover:bg-slate-50/50 transition-colors ${editingUserId === u.id ? 'bg-amber-50/30' : ''}`}>
@@ -207,6 +227,11 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
                         <td className="px-6 py-5">
                           <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${u.productPermission === 'none' ? 'bg-slate-100 text-slate-400' : u.productPermission === 'read' ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-600 text-white'}`}>
                             {u.productPermission === 'none' ? '권한없음' : u.productPermission === 'read' ? '읽기전용' : '편집권한'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5">
+                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${u.showPricePermission ? 'bg-sky-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400'}`}>
+                            {u.showPricePermission ? '표시함' : '권한없음'}
                           </span>
                         </td>
                         <td className="px-6 py-5">

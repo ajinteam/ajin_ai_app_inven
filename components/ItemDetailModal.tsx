@@ -5,7 +5,7 @@ import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, Tr
 
 interface ItemDetailModalProps {
   item: Item;
-  authRole: 'admin' | 'product_only';
+  authRole: 'admin' | 'product_only' | 'custom' | null;
   allUsedSerials: string[];
   existingCodes: string[];
   onAddTransaction: (itemId: string, transaction: Omit<Transaction, 'id'>) => void;
@@ -14,6 +14,7 @@ interface ItemDetailModalProps {
   onDeleteTransaction: (itemId: string, transactionId: string) => void;
   onUpdateItem: (itemId: string, updatedData: Partial<Item>) => void;
   onClose: () => void;
+  showPrice?: boolean;
 }
 
 const ADMIN_PASSWORD = '5200';
@@ -87,7 +88,7 @@ const toLocalDatetimeString = (dateStr: string | number | undefined): string => 
 };
 
 const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ 
-  item, authRole, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose 
+  item, authRole, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
 }) => {
   const [transactionType, setTransactionType] = useState<'purchase' | 'release'>('purchase');
   const [quantity, setQuantity] = useState('');
@@ -141,7 +142,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setEditFormData({
       name: item.name, code: item.code, modelName: item.modelName, application: item.application,
       drawingNumber: item.drawingNumber, spec: item.spec || '', remarks: item.remarks, registrationDate: item.registrationDate,
-      category: item.category
+      category: item.category, unitPrice: item.unitPrice
     });
   }, [item]);
 
@@ -521,6 +522,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">판매</span>
                 <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{saleSum}</div>
               </div>
+              {showPrice && (
+                <div className="flex flex-col items-center">
+                  <span className="text-indigo-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">판매 금액</span>
+                  <div className="border border-indigo-500 bg-white px-3 py-1 rounded-md text-indigo-700 font-black text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{(saleSum * (item.unitPrice || 0)).toLocaleString()}원</div>
+                </div>
+              )}
               <div className="flex flex-col items-center">
                 <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">반품AS</span>
                 <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{returnASSum}</div>
@@ -576,6 +583,17 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                         <input name="spec" value={editFormData.spec || ''} onChange={(e) => setEditFormData({...editFormData, spec: e.target.value})} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 rounded-xl text-base sm:text-lg font-bold" /></div>
                       </>
                     )}
+                    {showPrice && (
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">단가 (원)</label>
+                        <input 
+                          type="number" 
+                          value={editFormData.unitPrice !== undefined ? editFormData.unitPrice : ''} 
+                          onChange={(e) => setEditFormData({...editFormData, unitPrice: parseInt(e.target.value, 10) || 0})} 
+                          className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" 
+                        />
+                      </div>
+                    )}
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">비고</label>
                     <textarea name="remarks" value={editFormData.remarks || ''} onChange={(e) => setEditFormData({...editFormData, remarks: e.target.value})} rows={2} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 rounded-xl text-base sm:text-lg font-bold" /></div>
                 </div>
@@ -594,6 +612,18 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </>
                     )}
                     <div className="flex justify-between pb-2"><span className="text-slate-400 font-black uppercase text-[10px]">Reg Date</span><span className="font-bold text-slate-500">{item.registrationDate}</span></div>
+                    {showPrice && (
+                      <>
+                        <div className="flex justify-between border-t border-slate-100 pt-2 pb-1">
+                          <span className="text-slate-400 font-black uppercase text-[10px]">Unit Price</span>
+                          <span className="font-bold text-slate-800">{(item.unitPrice || 0).toLocaleString()}원</span>
+                        </div>
+                        <div className="flex justify-between pb-2">
+                          <span className="text-slate-400 font-black uppercase text-[10px]">Total Sales Amount</span>
+                          <span className="font-extrabold text-indigo-600">{(saleSum * (item.unitPrice || 0)).toLocaleString()}원</span>
+                        </div>
+                      </>
+                    )}
                     {item.remarks && (<div className="mt-4 p-4 bg-white rounded-xl border border-slate-100 text-slate-600 font-bold leading-relaxed italic text-sm whitespace-pre-wrap break-all">"{item.remarks}"</div>)}
                   </div>
                 </>
