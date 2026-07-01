@@ -344,13 +344,13 @@ export default function DateSalesSearchModal({
                       <div>
                         <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">단가</span>
                         <span className="font-black text-slate-700">
-                          {(item.unitPrice || 0).toLocaleString()} 원
+                          {(transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0)).toLocaleString()} 원
                         </span>
                       </div>
                       <div className="text-right">
                         <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">금액</span>
                         <span className="font-black text-emerald-600">
-                          {(transaction.quantity * (item.unitPrice || 0)).toLocaleString()} 원
+                          {(transaction.quantity * (transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0))).toLocaleString()} 원
                         </span>
                       </div>
                     </div>
@@ -455,12 +455,12 @@ export default function DateSalesSearchModal({
                         </td>
                         {showPrice && (
                           <td className="px-6 py-4 text-right font-black text-xs sm:text-sm text-slate-600">
-                            {(item.unitPrice || 0).toLocaleString()}원
+                            {(transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0)).toLocaleString()}원
                           </td>
                         )}
                         {showPrice && (
                           <td className="px-6 py-4 text-right font-extrabold text-xs sm:text-sm text-emerald-600">
-                            {(transaction.quantity * (item.unitPrice || 0)).toLocaleString()}원
+                            {(transaction.quantity * (transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0))).toLocaleString()}원
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-black text-sm sm:text-base text-slate-900">

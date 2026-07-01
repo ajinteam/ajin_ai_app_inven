@@ -232,49 +232,123 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 <p className="text-xl sm:text-3xl font-black uppercase tracking-widest text-center">조건에 맞는 결과가 없습니다</p>
               </div>
             ) : viewMode === 'flat' ? (
-              <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-xl">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-black uppercase tracking-widest">
-                      <tr>
-                        <th className="px-6 py-5">날짜</th>
-                        <th className="px-6 py-5">브랜드</th>
-                        <th className="px-6 py-5">제품명</th>
-                        <th className="px-6 py-5">일련번호</th>
-                        {showPrice && <th className="px-6 py-5 text-right">단가</th>}
-                        {showPrice && <th className="px-6 py-5 text-right">금액</th>}
-                        <th className="px-6 py-5 text-right">수량</th>
-                        <th className="px-6 py-5">대상자 / 아이디</th>
-                        <th className="px-6 py-5">비고</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {filteredReleases.map((r, i) => (
-                        <tr key={r.id || i} className="hover:bg-indigo-50/30 transition-colors">
-                          <td className="px-6 py-6 font-bold text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
-                          <td className="px-6 py-6 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
-                          <td className="px-6 py-6 font-black text-slate-800">{r.itemName}</td>
-                          <td className="px-6 py-6 font-mono font-black text-indigo-400">{r.serialNumber || '-'}</td>
-                          {showPrice && (
-                            <td className="px-6 py-6 text-right font-bold text-slate-500">
-                              {(r.unitPrice || 0).toLocaleString()}원
-                            </td>
+              <div className="space-y-4">
+                {/* Mobile Flat Card List */}
+                <div className="space-y-4 lg:hidden">
+                  {filteredReleases.map((r, i) => (
+                    <div key={r.id || i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase tracking-wider border border-indigo-100">
+                            {r.itemBrand}
+                          </span>
+                          <h4 className="font-black text-slate-800 text-sm mt-1.5 leading-snug">{r.itemName}</h4>
+                          <p className="text-[9px] font-mono text-slate-400 font-bold mt-0.5">{r.itemCode || ''}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] font-mono font-bold text-slate-400 block">
+                            {new Date(r.date).toLocaleDateString()}
+                          </span>
+                          {r.serialNumber && (
+                            <span className="font-mono font-black text-[10px] text-indigo-600 block mt-1">
+                              # {r.serialNumber}
+                            </span>
                           )}
-                          {showPrice && (
-                            <td className="px-6 py-6 text-right font-extrabold text-emerald-600">
-                              {(r.quantity * (r.unitPrice || 0)).toLocaleString()}원
-                            </td>
-                          )}
-                          <td className="px-6 py-6 font-black text-lg text-right">{r.quantity} EA</td>
-                          <td className="px-6 py-6">
-                            <p className="font-black text-slate-900">{r.customerName || '-'}</p>
-                            {r.userId && <span className="bg-slate-100 text-slate-400 text-[9px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
-                          </td>
-                          <td className="px-6 py-6 text-[10px] text-slate-400 font-bold max-w-[200px] truncate" title={r.remarks}>{r.remarks || '-'}</td>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50 text-xs">
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">구매자 (대상)</span>
+                          <span className="font-black text-slate-800">
+                            {r.customerName || '-'}
+                            {r.userId && (
+                              <span className="ml-1 bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">
+                                {r.userId}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">수량</span>
+                          <span className="font-black text-slate-900 text-sm">
+                            {r.quantity.toLocaleString()} EA
+                          </span>
+                        </div>
+                      </div>
+
+                      {showPrice && (
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50 text-xs">
+                          <div>
+                            <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">단가</span>
+                            <span className="font-black text-slate-700">
+                              {(r.unitPrice || 0).toLocaleString()} 원
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">총액</span>
+                            <span className="font-black text-emerald-600 text-sm">
+                              {(r.quantity * (r.unitPrice || 0)).toLocaleString()} 원
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {r.remarks && (
+                        <div className="pt-2 border-t border-slate-50 text-[10px] text-slate-450 font-bold">
+                          <span className="text-[8px] text-slate-300 block uppercase tracking-wider">비고</span>
+                          <p className="mt-0.5 italic">{r.remarks}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Flat Table */}
+                <div className="hidden lg:block bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-black uppercase tracking-widest">
+                        <tr>
+                          <th className="px-6 py-5">날짜</th>
+                          <th className="px-6 py-5">브랜드</th>
+                          <th className="px-6 py-5">제품명</th>
+                          <th className="px-6 py-5">일련번호</th>
+                          {showPrice && <th className="px-6 py-5 text-right">단가</th>}
+                          {showPrice && <th className="px-6 py-5 text-right">금액</th>}
+                          <th className="px-6 py-5 text-right">수량</th>
+                          <th className="px-6 py-5">대상자 / 아이디</th>
+                          <th className="px-6 py-5">비고</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {filteredReleases.map((r, i) => (
+                          <tr key={r.id || i} className="hover:bg-indigo-50/30 transition-colors">
+                            <td className="px-6 py-6 font-bold text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
+                            <td className="px-6 py-6 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
+                            <td className="px-6 py-6 font-black text-slate-800">{r.itemName}</td>
+                            <td className="px-6 py-6 font-mono font-black text-indigo-400">{r.serialNumber || '-'}</td>
+                            {showPrice && (
+                              <td className="px-6 py-6 text-right font-bold text-slate-500">
+                                {(r.unitPrice || 0).toLocaleString()}원
+                              </td>
+                            )}
+                            {showPrice && (
+                              <td className="px-6 py-6 text-right font-extrabold text-emerald-600">
+                                {(r.quantity * (r.unitPrice || 0)).toLocaleString()}원
+                              </td>
+                            )}
+                            <td className="px-6 py-6 font-black text-lg text-right">{r.quantity} EA</td>
+                            <td className="px-6 py-6">
+                              <p className="font-black text-slate-900">{r.customerName || '-'}</p>
+                              {r.userId && <span className="bg-slate-100 text-slate-400 text-[9px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                            </td>
+                            <td className="px-6 py-6 text-[10px] text-slate-400 font-bold max-w-[200px] truncate" title={r.remarks}>{r.remarks || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             ) : viewMode === 'grouped' ? (
@@ -299,8 +373,65 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                       )}
                     </div>
                     
-                    {/* Group Table */}
-                    <div className="overflow-x-auto">
+                    {/* Mobile Card List (Grouped by Date) */}
+                    <div className="space-y-3 lg:hidden">
+                      {group.list.map((r, idx) => (
+                        <div key={r.id || idx} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[8px] font-black uppercase tracking-wider border border-indigo-100">
+                                {r.itemBrand}
+                              </span>
+                              <h5 className="font-black text-slate-800 text-xs mt-1.5 leading-snug">{r.itemName}</h5>
+                            </div>
+                            <div className="text-right shrink-0">
+                              {r.serialNumber && (
+                                <span className="font-mono font-black text-[9px] text-indigo-500 block">
+                                  # {r.serialNumber}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100/60 text-xs">
+                            <div>
+                              <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider">대상자/아이디</span>
+                              <span className="font-black text-slate-700">
+                                {r.customerName || '-'}
+                                {r.userId && <span className="ml-1 bg-slate-100 text-slate-450 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider">수량</span>
+                              <span className="font-black text-slate-900">{r.quantity.toLocaleString()} EA</span>
+                            </div>
+                          </div>
+
+                          {showPrice && (
+                            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100/60 text-xs">
+                              <div>
+                                <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider">단가</span>
+                                <span className="font-black text-slate-600">{(r.unitPrice || 0).toLocaleString()}원</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider">금액</span>
+                                <span className="font-extrabold text-emerald-600">{(r.quantity * (r.unitPrice || 0)).toLocaleString()}원</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {r.remarks && (
+                            <div className="pt-2 border-t border-slate-100/60 text-[9px] text-slate-400">
+                              <span className="text-[8px] text-slate-300 block uppercase tracking-wider">비고</span>
+                              <p className="italic mt-0.5">{r.remarks}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Group Table (Desktop) */}
+                    <div className="hidden lg:block overflow-x-auto">
                       <table className="w-full text-left text-xs sm:text-sm">
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-black uppercase tracking-wider">
                           <tr>
@@ -366,8 +497,62 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                       )}
                     </div>
                     
-                    {/* Group Table */}
-                    <div className="overflow-x-auto">
+                    {/* Mobile Card List (Grouped by Code) */}
+                    <div className="space-y-3 lg:hidden">
+                      {group.list.map((r, idx) => (
+                        <div key={r.id || idx} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="font-bold text-slate-500 text-[11px]">
+                              📅 {new Date(r.date).toLocaleDateString()}
+                            </span>
+                            <div className="text-right shrink-0">
+                              {r.serialNumber && (
+                                <span className="font-mono font-black text-[9px] text-indigo-500 block">
+                                  # {r.serialNumber}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100/60 text-xs">
+                            <div>
+                              <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider">대상자/아이디</span>
+                              <span className="font-black text-slate-700">
+                                {r.customerName || '-'}
+                                {r.userId && <span className="ml-1 bg-slate-100 text-slate-450 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider">수량</span>
+                              <span className="font-black text-slate-900">{r.quantity.toLocaleString()} EA</span>
+                            </div>
+                          </div>
+
+                          {showPrice && (
+                            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100/60 text-xs">
+                              <div>
+                                <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider">단가</span>
+                                <span className="font-black text-slate-600">{(r.unitPrice || 0).toLocaleString()}원</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider">금액</span>
+                                <span className="font-extrabold text-emerald-600">{(r.quantity * (r.unitPrice || 0)).toLocaleString()}원</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {r.remarks && (
+                            <div className="pt-2 border-t border-slate-100/60 text-[9px] text-slate-400">
+                              <span className="text-[8px] text-slate-300 block uppercase tracking-wider">비고</span>
+                              <p className="italic mt-0.5">{r.remarks}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Group Table (Desktop) */}
+                    <div className="hidden lg:block overflow-x-auto">
                       <table className="w-full text-left text-xs sm:text-sm">
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-black uppercase tracking-wider">
                           <tr>
