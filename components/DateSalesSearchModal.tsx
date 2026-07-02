@@ -40,6 +40,16 @@ export default function DateSalesSearchModal({
     }
   };
 
+  const getTransactionPrice = (t: Transaction, item: Item) => {
+    if (t.unitPrice !== undefined && t.unitPrice !== 0) {
+      return t.unitPrice;
+    }
+    if (t.priceType === 'agency') {
+      return item.agencyPrice || item.unitPrice || 0;
+    }
+    return item.unitPrice || 0;
+  };
+
   // Get all release (sale) transactions matching the date
   const salesOnDate = useMemo(() => {
     const list: { item: Item; transaction: Transaction }[] = [];
@@ -108,7 +118,7 @@ export default function DateSalesSearchModal({
     const map: { [code: string]: { qty: number; amount: number } } = {};
     filteredSales.forEach(({ item, transaction }) => {
       const code = item.code || 'UNKNOWN';
-      const price = transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0);
+      const price = getTransactionPrice(transaction, item);
       if (!map[code]) {
         map[code] = { qty: 0, amount: 0 };
       }
@@ -122,14 +132,14 @@ export default function DateSalesSearchModal({
 
   const totalSalesAmountOnDate = useMemo(() => {
     return salesOnDate.reduce((sum, s) => {
-      const price = s.transaction.unitPrice !== undefined ? s.transaction.unitPrice : (s.item.unitPrice || 0);
+      const price = getTransactionPrice(s.transaction, s.item);
       return sum + (s.transaction.quantity * price);
     }, 0);
   }, [salesOnDate]);
 
   const filteredSalesAmount = useMemo(() => {
     return filteredSales.reduce((sum, s) => {
-      const price = s.transaction.unitPrice !== undefined ? s.transaction.unitPrice : (s.item.unitPrice || 0);
+      const price = getTransactionPrice(s.transaction, s.item);
       return sum + (s.transaction.quantity * price);
     }, 0);
   }, [filteredSales]);
@@ -344,13 +354,13 @@ export default function DateSalesSearchModal({
                       <div>
                         <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">단가</span>
                         <span className="font-black text-slate-700">
-                          {(transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0)).toLocaleString()} 원
+                          {getTransactionPrice(transaction, item).toLocaleString()} 원
                         </span>
                       </div>
                       <div className="text-right">
                         <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">금액</span>
                         <span className="font-black text-emerald-600">
-                          {(transaction.quantity * (transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0))).toLocaleString()} 원
+                          {(transaction.quantity * getTransactionPrice(transaction, item)).toLocaleString()} 원
                         </span>
                       </div>
                     </div>
@@ -455,12 +465,12 @@ export default function DateSalesSearchModal({
                         </td>
                         {showPrice && (
                           <td className="px-6 py-4 text-right font-black text-xs sm:text-sm text-slate-600">
-                            {(transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0)).toLocaleString()}원
+                            {getTransactionPrice(transaction, item).toLocaleString()}원
                           </td>
                         )}
                         {showPrice && (
                           <td className="px-6 py-4 text-right font-extrabold text-xs sm:text-sm text-emerald-600">
-                            {(transaction.quantity * (transaction.unitPrice !== undefined ? transaction.unitPrice : (item.unitPrice || 0))).toLocaleString()}원
+                            {(transaction.quantity * getTransactionPrice(transaction, item)).toLocaleString()}원
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-black text-sm sm:text-base text-slate-900">

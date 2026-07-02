@@ -37,7 +37,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             itemName: item.name,
             itemBrand: item.category || '-',
             itemCode: item.code || '',
-            unitPrice: t.unitPrice !== undefined ? t.unitPrice : (item.unitPrice || 0)
+            unitPrice: (t.unitPrice !== undefined && t.unitPrice !== 0) ? t.unitPrice : (t.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0))
           });
         }
       });
@@ -56,8 +56,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
         r.customerName?.toLowerCase().includes(nameMatch) || 
         r.userId?.toLowerCase().includes(nameMatch);
       
-      const matchesDate = dateMatch === '' || 
-        r.date.startsWith(dateMatch);
+      let matchesDate = true;
+      if (dateMatch !== '') {
+        const dateObj = new Date(r.date);
+        const yyyy = dateObj.getFullYear();
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const localDateStr = isNaN(yyyy) ? r.date.split('T')[0] : `${yyyy}-${mm}-${dd}`;
+        matchesDate = localDateStr.startsWith(dateMatch);
+      }
 
       return matchesName && matchesDate;
     });

@@ -221,7 +221,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     return item.transactions
       .filter(t => t.type === 'release' && !t.isDiscarded && (!t.customerName || (t.customerName.trim() !== '대천' && t.customerName.trim() !== '대천공장')))
       .reduce((sum, t) => {
-        const price = t.unitPrice !== undefined ? t.unitPrice : (item.unitPrice || 0);
+        const price = (t.unitPrice !== undefined && t.unitPrice !== 0) ? t.unitPrice : (t.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0));
         return sum + (t.quantity * price);
       }, 0);
   }, [item.transactions, item.unitPrice]);
@@ -908,7 +908,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                               </span>
                                               {showPrice && t.type === 'release' && (
                                                 <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-500 whitespace-nowrap">
-                                                  {((t.unitPrice !== undefined ? t.unitPrice : (item.unitPrice || 0)) * t.quantity).toLocaleString()}원
+                                                  {(((t.unitPrice !== undefined && t.unitPrice !== 0) ? t.unitPrice : (t.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0))) * t.quantity).toLocaleString()}원
                                                   <span className="text-[8px] text-slate-400 font-bold ml-1">
                                                     ({t.priceType === 'agency' ? '대리점' : '일반'})
                                                   </span>
