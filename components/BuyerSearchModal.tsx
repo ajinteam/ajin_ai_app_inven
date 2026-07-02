@@ -145,7 +145,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] animate-fade-in-up flex flex-col h-full max-h-[92vh] overflow-hidden">
+      <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] animate-fade-in-up flex flex-col h-full max-h-[92vh] overflow-y-auto lg:overflow-hidden">
         <div className="p-6 sm:p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
@@ -286,8 +286,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           )}
         </div>
 
-        <div className="flex-grow overflow-hidden bg-slate-50/50">
-          <div className="h-full overflow-y-auto p-6 sm:p-10 scrollbar-hide">
+        <div className="flex-grow lg:overflow-hidden bg-slate-50/50">
+          <div className="p-6 sm:p-10 scrollbar-hide lg:h-full lg:overflow-y-auto">
             {filteredReleases.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-20 opacity-20">
                 <SearchIcon className="w-20 h-20 sm:w-32 sm:h-32 mb-6" />

@@ -171,7 +171,7 @@ export default function DateSalesSearchModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 animate-fade-in">
-      <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] flex flex-col h-full max-h-[92vh] overflow-hidden border border-slate-100 animate-fade-in-up">
+      <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] flex flex-col h-full max-h-[92vh] overflow-y-auto md:overflow-hidden border border-slate-100 animate-fade-in-up">
         {/* Header */}
         <div className="px-6 sm:px-10 py-5 sm:py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3">
@@ -220,7 +220,7 @@ export default function DateSalesSearchModal({
         </div>
 
         {/* Content Body */}
-        <div className="flex-grow overflow-y-auto md:overflow-hidden flex flex-col p-4 sm:p-10 bg-slate-50/30">
+        <div className="flex-grow md:overflow-hidden flex flex-col p-4 sm:p-10 bg-slate-50/30">
           {/* Summary */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm">
             <div className="flex flex-wrap items-center gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
@@ -298,7 +298,7 @@ export default function DateSalesSearchModal({
           )}
 
           {/* Mobile List View (only on small screens) */}
-          <div className="block md:hidden flex-grow overflow-y-auto space-y-3 pr-1 scrollbar-hide">
+          <div className="block md:hidden space-y-3 pr-1">
             {filteredSales.length === 0 ? (
               <div className="py-20 text-center text-slate-300 font-black uppercase tracking-widest italic text-sm">
                 해당 조건의 판매 데이터가 존재하지 않습니다
