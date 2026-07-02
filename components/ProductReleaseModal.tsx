@@ -236,6 +236,10 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
     if (releaseList.length === 0) { alert('출고할 품목이 없습니다.'); return; }
     if (!customerInfo.name) { alert('대상자 이름을 입력하세요.'); return; }
 
+    if (!confirm('출고 처리를 완료하시겠습니까?')) {
+      return;
+    }
+
     const getReleaseDateWithCurrentTime = () => {
       const d = new Date();
       const [yr, mo, dy] = releaseDate.split('-').map(Number);
@@ -285,7 +289,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
           <div className="space-y-4">
             <h3 className="text-sm font-black text-indigo-600 uppercase tracking-widest border-l-4 border-indigo-600 pl-3">제품출고 정보</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:col-span-2">
                 <label className="sm:w-24 text-xs font-black text-indigo-650 uppercase">출고 일자 *</label>
                 <input type="date" value={releaseDate} onChange={e => setReleaseDate(e.target.value)} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" required />
               </div>
@@ -293,9 +297,9 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">대상자 *</label>
                 <input value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" placeholder="대상자 이름" />
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:col-span-2">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">아이디</label>
-                <input value={customerInfo.userId} onChange={e => setCustomerInfo({...customerInfo, userId: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400" />
+                <input value={customerInfo.userId} onChange={e => setCustomerInfo({...customerInfo, userId: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400" placeholder="아이디" />
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:col-span-2">
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">연락처</label>
