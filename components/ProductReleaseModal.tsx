@@ -81,6 +81,14 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
     remarks: ''
   });
 
+  const [releaseDate, setReleaseDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
   // Current Selection
   const [brand, setBrand] = useState<'GiL' | 'KATO' | 'TOMIX'>('GiL');
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -228,6 +236,14 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
     if (releaseList.length === 0) { alert('출고할 품목이 없습니다.'); return; }
     if (!customerInfo.name) { alert('대상자 이름을 입력하세요.'); return; }
 
+    const getReleaseDateWithCurrentTime = () => {
+      const d = new Date();
+      const [yr, mo, dy] = releaseDate.split('-').map(Number);
+      // Create a Date object in local timezone
+      const dateObj = new Date(yr, mo - 1, dy, d.getHours(), d.getMinutes(), d.getSeconds());
+      return dateObj.toISOString();
+    };
+
     const payload = releaseList.map(r => {
       // Construct remarks: only add brackets if customerInfo.remarks exists
       const prefix = customerInfo.remarks ? `[${customerInfo.remarks}] ` : "";
@@ -238,7 +254,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
         transaction: {
           type: 'release' as const,
           quantity: r.quantity,
-          date: new Date().toISOString(),
+          date: getReleaseDateWithCurrentTime(),
           remarks: finalRemarks,
           serialNumber: r.serial,
           customerName: customerInfo.name,
@@ -270,10 +286,14 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
             <h3 className="text-sm font-black text-indigo-600 uppercase tracking-widest border-l-4 border-indigo-600 pl-3">제품출고 정보</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">대상자</label>
-                <input value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                <label className="sm:w-24 text-xs font-black text-indigo-650 uppercase">출고 일자 *</label>
+                <input type="date" value={releaseDate} onChange={e => setReleaseDate(e.target.value)} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" required />
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">대상자 *</label>
+                <input value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" placeholder="대상자 이름" />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:col-span-2">
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">아이디</label>
                 <input value={customerInfo.userId} onChange={e => setCustomerInfo({...customerInfo, userId: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400" />
               </div>

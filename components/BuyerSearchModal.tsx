@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Item, Transaction } from '../types';
 import { CloseIcon, SearchIcon, DownloadIcon } from './icons';
 
@@ -13,6 +13,14 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   const [nameTerm, setNameTerm] = useState('');
   const [dateTerm, setDateTerm] = useState('');
   const [viewMode, setViewMode] = useState<'flat' | 'grouped' | 'byCode'>('flat');
+  const [selectedGroupDate, setSelectedGroupDate] = useState('');
+  const [selectedGroupCode, setSelectedGroupCode] = useState('');
+
+  // Reset filter when switching modes
+  useEffect(() => {
+    setSelectedGroupDate('');
+    setSelectedGroupCode('');
+  }, [viewMode]);
 
   // Extract all release transactions from all products
   const allReleases = useMemo(() => {
@@ -222,6 +230,60 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               </button>
             </div>
           </div>
+
+          {viewMode !== 'flat' && (
+            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 animate-fade-in bg-slate-50/50 p-4 rounded-2xl border-2 border-indigo-50">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="self-start sm:self-auto px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-black uppercase tracking-wider">
+                  {viewMode === 'grouped' ? '날짜 필터' : '제품코드 필터'}
+                </span>
+                <p className="text-xs font-bold text-slate-500">
+                  {viewMode === 'grouped' ? '원하는 날짜만 선택하여 빠르게 확인하세요.' : '원하는 제품코드만 선택하여 빠르게 확인하세요.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {viewMode === 'grouped' ? (
+                  <select
+                    value={selectedGroupDate}
+                    onChange={e => setSelectedGroupDate(e.target.value)}
+                    className="flex-grow sm:flex-initial w-full sm:w-[280px] px-3 py-2 text-xs bg-white border-2 border-indigo-200 focus:border-indigo-400 rounded-xl font-bold outline-none shadow-sm transition-all text-slate-700"
+                  >
+                    <option value="">📅 전체 날짜 ({groupedByDate.length}개 그룹)</option>
+                    {groupedByDate.map(g => (
+                      <option key={g.date} value={g.date}>
+                        {g.date} ({g.list.length}건 / {g.qty.toLocaleString()} EA)
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={selectedGroupCode}
+                    onChange={e => setSelectedGroupCode(e.target.value)}
+                    className="flex-grow sm:flex-initial w-full sm:w-[350px] px-3 py-2 text-xs bg-white border-2 border-indigo-200 focus:border-indigo-400 rounded-xl font-bold outline-none shadow-sm transition-all text-slate-700"
+                  >
+                    <option value="">📦 전체 제품코드 ({groupedByCode.length}개 그룹)</option>
+                    {groupedByCode.map(g => (
+                      <option key={g.code} value={g.code}>
+                        [{g.code}] {g.name.slice(0, 25)}{g.name.length > 25 ? '...' : ''} ({g.list.length}건)
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {((viewMode === 'grouped' && selectedGroupDate) || (viewMode === 'byCode' && selectedGroupCode)) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedGroupDate('');
+                      setSelectedGroupCode('');
+                    }}
+                    className="px-3 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-xs font-black hover:bg-indigo-600 hover:text-white transition-all shrink-0"
+                  >
+                    전체보기
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-grow overflow-hidden bg-slate-50/50">
@@ -353,7 +415,9 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               </div>
             ) : viewMode === 'grouped' ? (
               <div className="space-y-6">
-                {groupedByDate.map((group) => (
+                {groupedByDate
+                  .filter(group => !selectedGroupDate || group.date === selectedGroupDate)
+                  .map((group) => (
                   <div key={group.date} className="bg-white border border-slate-100 rounded-[1.5rem] p-5 sm:p-6 shadow-md space-y-4">
                     {/* Group Header */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-100 gap-2">
@@ -477,7 +541,9 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               </div>
             ) : (
               <div className="space-y-6">
-                {groupedByCode.map((group) => (
+                {groupedByCode
+                  .filter(group => !selectedGroupCode || group.code === selectedGroupCode)
+                  .map((group) => (
                   <div key={group.code} className="bg-white border border-slate-100 rounded-[1.5rem] p-5 sm:p-6 shadow-md space-y-4">
                     {/* Group Header */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-100 gap-2">
