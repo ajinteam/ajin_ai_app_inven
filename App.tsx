@@ -69,8 +69,22 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'part' | 'product' | 'return'>('part');
   const [activeProductSubCategory, setActiveProductSubCategory] = useState<'ALL' | 'GiL' | 'KATO' | 'TOMIX'>('ALL');
   
-  const [items, setItems] = useState<Item[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [items, setItems] = useState<Item[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [users, setUsers] = useState<User[]>(() => {
+    try {
+      const saved = localStorage.getItem(USERS_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showProductReleaseModal, setShowProductReleaseModal] = useState(false);
@@ -106,8 +120,9 @@ const App: React.FC = () => {
   const isInitialLoad = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isHandlingPopstate = useRef(false);
+  const initialFetchPromiseRef = useRef<Promise<{ success: boolean; items: Item[]; users: User[] }> | null>(null);
 
-  const fetchFromCloud = async () => {
+  const fetchFromCloud = async (): Promise<{ success: boolean; items: Item[]; users: User[] }> => {
     setSyncStatus('loading');
     try {
       const response = await fetch('/api/inventory');
@@ -135,7 +150,8 @@ const App: React.FC = () => {
         const dedupedItems = Array.from(uniqueItemsMap.values());
         setItems(dedupedItems);
         
-        if (data.users) setUsers(data.users);
+        const fetchedUsers = data.users || [];
+        if (data.users) setUsers(fetchedUsers);
         if (data.encryptionActive !== undefined) {
           setEncryptionEnabled(data.encryptionActive);
         }
@@ -143,19 +159,22 @@ const App: React.FC = () => {
         setSyncStatus('success');
         setLastSyncedAt(new Date());
         localStorage.setItem(STORAGE_KEY, JSON.stringify(dedupedItems));
-        if (data.users) localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(data.users));
-        return true;
+        if (data.users) localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(fetchedUsers));
+        return { success: true, items: dedupedItems, users: fetchedUsers };
       }
     } catch (err) {
       console.warn('Cloud fetch failed, using local cache:', err);
       const savedItems = localStorage.getItem(STORAGE_KEY);
       const savedUsers = localStorage.getItem(USERS_STORAGE_KEY);
-      if (savedItems) setItems(JSON.parse(savedItems));
-      if (savedUsers) setUsers(JSON.parse(savedUsers));
+      const loadedItems = savedItems ? JSON.parse(savedItems) : [];
+      const loadedUsers = savedUsers ? JSON.parse(savedUsers) : [];
+      if (savedItems) setItems(loadedItems);
+      if (savedUsers) setUsers(loadedUsers);
       setDataSource('local');
       setSyncStatus('offline');
-      return false;
+      return { success: false, items: loadedItems, users: loadedUsers };
     }
+    return { success: false, items: [], users: [] };
   };
 
   const saveToCloud = async (data: Item[], userData: User[]) => {
@@ -187,7 +206,8 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchFromCloud().finally(() => {
+    initialFetchPromiseRef.current = fetchFromCloud();
+    initialFetchPromiseRef.current.finally(() => {
       isInitialLoad.current = false;
     });
   }, []);
@@ -371,27 +391,56 @@ const App: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginPassword === ADMIN_PASSWORD) {
-      setAuthRole('admin');
-      setCurrentUser({ id: 'admin', name: 'ADMINISTRATOR', password: ADMIN_PASSWORD, partPermission: 'edit', productPermission: 'edit' });
-      setActiveTab('part');
-    } else if (loginPassword === PRODUCT_ONLY_PASSWORD) {
-      setAuthRole('product_only');
-      setCurrentUser({ id: 'product_only', name: 'PRODUCT MANAGER', password: PRODUCT_ONLY_PASSWORD, partPermission: 'none', productPermission: 'edit' });
-      setActiveTab('product');
-    } else {
-      const foundUser = users.find(u => u.password === loginPassword);
-      if (foundUser) {
-        setAuthRole('custom');
-        setCurrentUser(foundUser);
-        if (foundUser.partPermission !== 'none') setActiveTab('part');
-        else if (foundUser.productPermission !== 'none') setActiveTab('product');
+    
+    const checkCredentials = (password: string, userList: User[]) => {
+      if (password === ADMIN_PASSWORD) {
+        setAuthRole('admin');
+        setCurrentUser({ id: 'admin', name: 'ADMINISTRATOR', password: ADMIN_PASSWORD, partPermission: 'edit', productPermission: 'edit' });
+        setActiveTab('part');
+        return true;
+      } else if (password === PRODUCT_ONLY_PASSWORD) {
+        setAuthRole('product_only');
+        setCurrentUser({ id: 'product_only', name: 'PRODUCT MANAGER', password: PRODUCT_ONLY_PASSWORD, partPermission: 'none', productPermission: 'edit' });
+        setActiveTab('product');
+        return true;
       } else {
-        alert('비밀번호가 틀렸습니다.');
+        const foundUser = userList.find(u => u.password === password);
+        if (foundUser) {
+          setAuthRole('custom');
+          setCurrentUser(foundUser);
+          if (foundUser.partPermission !== 'none') setActiveTab('part');
+          else if (foundUser.productPermission !== 'none') setActiveTab('product');
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // 1. First, check with the current user state (which contains local cached users from localStorage)
+    if (checkCredentials(loginPassword, users)) {
+      setLoginPassword('');
+      return;
+    }
+
+    // 2. If not matched, check if the initial cloud fetch is still running
+    if (isInitialLoad.current && initialFetchPromiseRef.current) {
+      try {
+        // Wait for the cloud fetch to finish
+        const result = await initialFetchPromiseRef.current;
+        // Check again with the freshly fetched list of users
+        if (result && checkCredentials(loginPassword, result.users)) {
+          setLoginPassword('');
+          return;
+        }
+      } catch (err) {
+        console.error('Error waiting for initial fetch during login:', err);
       }
     }
+
+    // 3. Still not matching
+    alert('비밀번호가 틀렸습니다.');
     setLoginPassword('');
   };
 
