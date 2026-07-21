@@ -828,7 +828,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                   <div className="relative">
                                     <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                                     <div className="flex flex-wrap gap-1 mt-1.5">
-                                      {(['대천AS', '대천공장'] as const).map((name) => (
+                                      {(['대천AS', '대천폐기'] as const).map((name) => (
                                         <button
                                           key={name}
                                           type="button"
@@ -842,7 +842,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                           {name}
                                         </button>
                                       ))}
-                                      {customerName && !['대천AS', '대천공장'].includes(customerName) && (
+                                      {customerName && !['대천AS', '대천폐기'].includes(customerName) && (
                                         <button
                                           type="button"
                                           onClick={() => setCustomerName('')}
@@ -874,7 +874,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                    <label className="block text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">대상자 / 고객명</label>
                                    <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                                    <div className="flex flex-wrap gap-1 mt-1.5">
-                                     {(['대천AS', '대천폐기', '대천공장'] as const).map((name) => (
+                                     {(['대천AS', '대천공장'] as const).map((name) => (
                                        <button
                                          key={name}
                                          type="button"
@@ -888,7 +888,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                          {name}
                                        </button>
                                      ))}
-                                     {customerName && !['대천AS', '대천폐기', '대천공장'].includes(customerName) && (
+                                     {customerName && !['대천AS', '대천공장'].includes(customerName) && (
                                        <button
                                          type="button"
                                          onClick={() => setCustomerName('')}
