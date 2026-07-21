@@ -15,6 +15,8 @@ export interface Transaction {
   isReturned?: boolean; // 반품 여부
   isDiscarded?: boolean; // 폐기 여부
   originalSerialNumber?: string; // 이전 일련번호 (수정 시 보관)
+  originalCustomerName?: string; // 이전 고객명 (반품 후 재판매 시 보관)
+  isResold?: boolean; // 재판매 여부
   priceType?: 'general' | 'agency'; // 단가 구분 (일반 또는 대리점용)
   unitPrice?: number; // 거래 시점 단가
 }

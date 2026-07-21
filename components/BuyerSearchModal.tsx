@@ -54,7 +54,10 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     return allReleases.filter(r => {
       const matchesName = nameMatch === '' || 
         r.customerName?.toLowerCase().includes(nameMatch) || 
-        r.userId?.toLowerCase().includes(nameMatch);
+        r.originalCustomerName?.toLowerCase().includes(nameMatch) || 
+        r.userId?.toLowerCase().includes(nameMatch) ||
+        r.serialNumber?.toLowerCase().includes(nameMatch) ||
+        r.originalSerialNumber?.toLowerCase().includes(nameMatch);
       
       let matchesDate = true;
       if (dateMatch !== '') {
@@ -318,6 +321,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           <span className="text-[10px] font-mono font-bold text-slate-400 block">
                             {new Date(r.date).toLocaleDateString()}
                           </span>
+                          {r.originalSerialNumber && (
+                            <span className="text-[8px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1 block">
+                              # {r.originalSerialNumber}
+                            </span>
+                          )}
                           {r.serialNumber && (
                             <span className="font-mono font-black text-[10px] text-indigo-600 block mt-1">
                               # {r.serialNumber}
@@ -330,12 +338,19 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                         <div>
                           <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">구매자 (대상)</span>
                           <span className="font-black text-slate-800">
-                            {r.customerName || '-'}
-                            {r.userId && (
-                              <span className="ml-1 bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">
-                                {r.userId}
+                            <div className="flex flex-col">
+                              {r.originalCustomerName && (
+                                <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{r.originalCustomerName}</span>
+                              )}
+                              <span>
+                                {r.customerName || '-'}
+                                {r.userId && (
+                                  <span className="ml-1 bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">
+                                    {r.userId}
+                                  </span>
+                                )}
                               </span>
-                            )}
+                            </div>
                           </span>
                         </div>
                         <div className="text-right">
@@ -396,7 +411,12 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                             <td className="px-6 py-6 font-bold text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
                             <td className="px-6 py-6 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
                             <td className="px-6 py-6 font-black text-slate-800">{r.itemName}</td>
-                            <td className="px-6 py-6 font-mono font-black text-indigo-400">{r.serialNumber || '-'}</td>
+                            <td className="px-6 py-6 font-mono font-black text-indigo-400">
+                              {r.originalSerialNumber && (
+                                <span className="text-[10px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1 block mb-0.5">{r.originalSerialNumber}</span>
+                              )}
+                              <span>{r.serialNumber || '-'}</span>
+                            </td>
                             {showPrice && (
                               <td className="px-6 py-6 text-right font-bold text-slate-500">
                                 {(r.unitPrice || 0).toLocaleString()}원
@@ -409,8 +429,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                             )}
                             <td className="px-6 py-6 font-black text-lg text-right">{r.quantity} EA</td>
                             <td className="px-6 py-6">
-                              <p className="font-black text-slate-900">{r.customerName || '-'}</p>
-                              {r.userId && <span className="bg-slate-100 text-slate-400 text-[9px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                              <div className="flex flex-col">
+                                {r.originalCustomerName && (
+                                  <span className="text-[10px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{r.originalCustomerName}</span>
+                                )}
+                                <div className="flex items-center gap-1">
+                                  <p className="font-black text-slate-900">{r.customerName || '-'}</p>
+                                  {r.userId && <span className="bg-slate-100 text-slate-400 text-[9px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                </div>
+                              </div>
                             </td>
                             <td className="px-6 py-6 text-[10px] text-slate-400 font-bold max-w-[200px] truncate" title={r.remarks}>{r.remarks || '-'}</td>
                           </tr>

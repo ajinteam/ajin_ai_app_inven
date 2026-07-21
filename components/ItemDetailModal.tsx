@@ -298,6 +298,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     return sortedTrans.filter(t => {
       const serialMatch = t.serialNumber?.toLowerCase() === term || t.originalSerialNumber?.toLowerCase() === term;
       const otherMatch = t.customerName?.toLowerCase().includes(term) || 
+                         t.originalCustomerName?.toLowerCase().includes(term) || 
                          t.remarks?.toLowerCase().includes(term) ||
                          t.userId?.toLowerCase().includes(term);
       
@@ -1101,11 +1102,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                                 </div>
                                               ) : (
                                                 <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
-                                                  <div className="flex items-center gap-1">
-                                                    <p className="font-black text-slate-800 text-[10px] sm:text-sm">{t.customerName || '-'}</p>
-                                                    {t.userId && <span className="bg-slate-100 text-slate-500 text-[6px] sm:text-[8px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
+                                                  <div className="flex flex-col">
+                                                    {t.originalCustomerName && (
+                                                      <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{t.originalCustomerName}</span>
+                                                    )}
+                                                    <div className="flex items-center gap-1">
+                                                      <p className="font-black text-slate-800 text-[10px] sm:text-sm">{t.customerName || '-'}</p>
+                                                      {t.userId && <span className="bg-slate-100 text-slate-500 text-[6px] sm:text-[8px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
+                                                    </div>
                                                   </div>
-                                                  <p className="text-slate-400 font-bold text-[8px] sm:text-[10px]">{t.phoneNumber || '-'}</p>
+                                                  <p className="text-slate-400 font-bold text-[8px] sm:text-[10px] mt-1">{t.phoneNumber || '-'}</p>
                                                 </div>
                                               )}
                                             </td>

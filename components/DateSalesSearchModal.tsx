@@ -338,7 +338,10 @@ export default function DateSalesSearchModal({
                     <div>
                       <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">일련번호</span>
                       <span className="font-mono font-black text-indigo-600">
-                        {transaction.serialNumber || '-'}
+                        {transaction.originalSerialNumber && (
+                          <span className="text-[9px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1 block mb-0.5">{transaction.originalSerialNumber}</span>
+                        )}
+                        <span>{transaction.serialNumber || '-'}</span>
                       </span>
                     </div>
                     <div className="text-right">
@@ -369,16 +372,21 @@ export default function DateSalesSearchModal({
                   <div className="pt-2.5 border-t border-slate-50 flex items-center justify-between text-xs">
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">구매자 (대상)</span>
                     {transaction.customerName ? (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedBuyerFilter(transaction.customerName?.trim() || 'ALL')}
-                        className="hover:text-indigo-600 hover:underline cursor-pointer transition-all flex items-center gap-1.5 group/btn bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 px-2 py-1 rounded-lg"
-                      >
-                        <span className="font-extrabold text-slate-700">{transaction.customerName}</span>
-                        <span className="text-[8px] text-indigo-600 font-black bg-white px-1 py-0.5 rounded border border-slate-100/50">
-                          필터 [A]
-                        </span>
-                      </button>
+                      <div className="flex flex-col items-end">
+                        {transaction.originalCustomerName && (
+                          <span className="text-[9px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-1">{transaction.originalCustomerName}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBuyerFilter(transaction.customerName?.trim() || 'ALL')}
+                          className="hover:text-indigo-600 hover:underline cursor-pointer transition-all flex items-center gap-1.5 group/btn bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 px-2 py-1 rounded-lg"
+                        >
+                          <span className="font-extrabold text-slate-700">{transaction.customerName}</span>
+                          <span className="text-[8px] text-indigo-600 font-black bg-white px-1 py-0.5 rounded border border-slate-100/50">
+                            필터 [A]
+                          </span>
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-slate-400 font-bold">-</span>
                     )}
@@ -444,24 +452,32 @@ export default function DateSalesSearchModal({
                           <p className="text-[9px] font-mono text-slate-400 font-bold mt-0.5">{item.code}</p>
                         </td>
                         <td className="px-6 py-4 font-mono text-xs font-black text-indigo-600">
-                          {transaction.serialNumber || '-'}
+                          {transaction.originalSerialNumber && (
+                            <span className="text-[10px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1 block mb-0.5">{transaction.originalSerialNumber}</span>
+                          )}
+                          <span>{transaction.serialNumber || '-'}</span>
                         </td>
                         <td className="px-6 py-4 font-black text-slate-700 text-xs sm:text-sm">
-                          {transaction.customerName ? (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedBuyerFilter(transaction.customerName?.trim() || 'ALL')}
-                              className="text-left hover:text-indigo-600 hover:underline cursor-pointer transition-all flex items-center gap-1.5 group/btn bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 px-2.5 py-1 rounded-lg"
-                              title={`${transaction.customerName} 구매자만 필터링`}
-                            >
-                              <span className="font-extrabold">{transaction.customerName}</span>
-                              <span className="text-[8px] sm:text-[9px] text-slate-400 group-hover/btn:text-indigo-600 font-bold bg-white px-1 py-0.5 rounded border border-slate-100/50">
-                                필터 [A]
-                              </span>
-                            </button>
-                          ) : (
-                            '-'
-                          )}
+                          <div className="flex flex-col">
+                            {transaction.originalCustomerName && (
+                              <span className="text-[10px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-1">{transaction.originalCustomerName}</span>
+                            )}
+                            {transaction.customerName ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedBuyerFilter(transaction.customerName?.trim() || 'ALL')}
+                                className="text-left hover:text-indigo-600 hover:underline cursor-pointer transition-all flex items-center gap-1.5 group/btn bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 px-2.5 py-1 rounded-lg w-fit"
+                                title={`${transaction.customerName} 구매자만 필터링`}
+                              >
+                                <span className="font-extrabold">{transaction.customerName}</span>
+                                <span className="text-[8px] sm:text-[9px] text-slate-400 group-hover/btn:text-indigo-600 font-bold bg-white px-1 py-0.5 rounded border border-slate-100/50">
+                                  필터 [A]
+                                </span>
+                              </button>
+                            ) : (
+                              '-'
+                            )}
+                          </div>
                         </td>
                         {showPrice && (
                           <td className="px-6 py-4 text-right font-black text-xs sm:text-sm text-slate-600">

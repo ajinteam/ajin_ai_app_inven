@@ -7,6 +7,7 @@ import ProductReleaseModal from './components/ProductReleaseModal';
 import BuyerSearchModal from './components/BuyerSearchModal';
 import UserManagementModal from './components/UserManagementModal';
 import DateSalesSearchModal from './components/DateSalesSearchModal';
+import ResaleModal from './components/ResaleModal';
 import { PlusIcon, BoxIcon, SearchIcon, TrashIcon, DownloadIcon, CloudIcon, ServerIcon, SyncIcon, ArrowDownIcon } from './components/icons';
 
 const detectDateInSearch = (text: string): string | null => {
@@ -119,6 +120,12 @@ const App: React.FC = () => {
   } | null>(null);
   const [restoreActionText, setRestoreActionText] = useState<'수리' | '교환' | '직접입력'>('수리');
   const [restoreDetailText, setRestoreDetailText] = useState('');
+
+  // Resale States
+  const [showResalePrompt, setShowResalePrompt] = useState<{
+    item: Item;
+    transaction: Transaction;
+  } | null>(null);
 
   const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline'>('loading');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
@@ -1081,6 +1088,18 @@ const App: React.FC = () => {
                                 >
                                   원복
                                 </button>
+                                <button 
+                                  id={`return_resale_btn_${transaction.id}`}
+                                  onClick={() => {
+                                    setShowResalePrompt({
+                                      item,
+                                      transaction
+                                    });
+                                  }}
+                                  className="px-3 py-1.5 bg-sky-50 text-sky-600 rounded-lg font-black text-[10px] uppercase border border-sky-100 hover:bg-sky-600 hover:text-white"
+                                >
+                                  재판매
+                                </button>
                               </>
                             )}
                             <button 
@@ -1298,6 +1317,19 @@ const App: React.FC = () => {
           onUpdateItem={handleUpdateItem} 
           onClose={() => setSelectedItemId(null)} 
           showPrice={showPrice}
+        />
+      )}
+      {showResalePrompt && (
+        <ResaleModal
+          item={showResalePrompt.item}
+          transaction={showResalePrompt.transaction}
+          allUsedSerials={allUsedSerials}
+          onConfirm={(itemId, transactionId, updatedData) => {
+            handleUpdateTransaction(itemId, transactionId, updatedData);
+            setShowResalePrompt(null);
+            alert('재판매 처리가 완료되었습니다. 반품 보관에서 복구되었습니다.');
+          }}
+          onClose={() => setShowResalePrompt(null)}
         />
       )}
     </div>
