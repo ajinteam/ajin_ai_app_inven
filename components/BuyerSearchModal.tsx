@@ -29,7 +29,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       item.transactions.forEach(t => {
         if (t.type === 'release' && !t.isDiscarded && !t.isReturned) {
           const cust = (t.customerName || '').trim();
-          if (cust === '대천' || cust === '대천공장') {
+          if (cust === '대천' || cust === '대천공장' || cust === '대천AS' || cust === '대천폐기') {
             return;
           }
           releases.push({

@@ -121,7 +121,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   useEffect(() => {
-    if (transactionType === 'purchase') {
+    const isDaecheonSpecial = transactionType === 'release' && (customerName === '대천AS' || customerName === '대천폐기');
+    if (transactionType === 'purchase' || isDaecheonSpecial) {
       setSerialNumber('');
     } else if (item.type === 'product' && !serialNumber) {
       if (item.category === 'GiL') {
@@ -137,7 +138,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         setSerialNumber('');
       }
     }
-  }, [item, allUsedSerials, serialNumber, transactionType]);
+  }, [item, allUsedSerials, serialNumber, transactionType, customerName]);
 
   useEffect(() => {
     setPriceType('general');
@@ -192,12 +193,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const currentStock = useMemo(() => item.transactions.reduce((acc, t) => {
     if (t.isDiscarded) return acc;
-    return t.type === 'purchase' ? acc + t.quantity : acc - t.quantity;
+    if (t.type === 'release') {
+      if (t.customerName && t.customerName.trim() === '대천폐기') {
+        return acc;
+      }
+      return acc - t.quantity;
+    } else {
+      return acc + t.quantity;
+    }
   }, 0), [item.transactions]);
 
   const purchaseSum = useMemo(() => {
     return item.transactions
-      .filter(t => t.type === 'purchase' && !t.isDiscarded && (!t.customerName || t.customerName.trim() !== '대천공장'))
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName?.trim() !== '대천AS')
       .reduce((acc, t) => acc + t.quantity, 0);
   }, [item.transactions]);
 
@@ -206,20 +214,28 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       .filter(t => t.type === 'release' && !t.isDiscarded)
       .reduce((acc, t) => acc + t.quantity, 0);
     const daecheonASReturn = item.transactions
-      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천공장')
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천AS')
       .reduce((acc, t) => acc + t.quantity, 0);
     return Math.max(0, totalRelease - daecheonASReturn);
   }, [item.transactions]);
 
   const saleSum = useMemo(() => {
     return item.transactions
-      .filter(t => t.type === 'release' && !t.isDiscarded && (!t.customerName || (t.customerName.trim() !== '대천' && t.customerName.trim() !== '대천공장')))
+      .filter(t => {
+        if (t.type !== 'release' || t.isDiscarded) return false;
+        const cust = (t.customerName || '').trim();
+        return cust !== '대천AS' && cust !== '대천' && cust !== '대천공장' && cust !== '대천폐기';
+      })
       .reduce((acc, t) => acc + t.quantity, 0);
   }, [item.transactions]);
 
   const totalSalesAmount = useMemo(() => {
     return item.transactions
-      .filter(t => t.type === 'release' && !t.isDiscarded && (!t.customerName || (t.customerName.trim() !== '대천' && t.customerName.trim() !== '대천공장')))
+      .filter(t => {
+        if (t.type !== 'release' || t.isDiscarded) return false;
+        const cust = (t.customerName || '').trim();
+        return cust !== '대천AS' && cust !== '대천' && cust !== '대천공장' && cust !== '대천폐기';
+      })
       .reduce((sum, t) => {
         const price = (t.unitPrice !== undefined && t.unitPrice !== 0) ? t.unitPrice : (t.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0));
         return sum + (t.quantity * price);
@@ -234,22 +250,33 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const daecheonWasteSum = useMemo(() => {
     return item.transactions
-      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천폐기')
+      .filter(t => !t.isDiscarded && t.customerName && t.customerName.trim() === '대천폐기')
       .reduce((acc, t) => acc + t.quantity, 0);
   }, [item.transactions]);
 
-  const daecheonASSum = useMemo(() => {
-    const releaseS = item.transactions
-      .filter(t => t.type === 'release' && !t.isDiscarded && t.customerName && (t.customerName.trim() === '대천' || t.customerName.trim() === '대천공장'))
+  const daecheonReleaseSum = useMemo(() => {
+    return item.transactions
+      .filter(t => t.type === 'release' && !t.isDiscarded && t.customerName && (t.customerName.trim() === '대천AS' || t.customerName.trim() === '대천' || t.customerName.trim() === '대천공장'))
       .reduce((acc, t) => acc + t.quantity, 0);
-    const purchaseS = item.transactions
-      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천공장')
-      .reduce((acc, t) => acc + t.quantity, 0);
-    const wasteS = item.transactions
-      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천폐기')
-      .reduce((acc, t) => acc + t.quantity, 0);
-    return Math.max(0, releaseS - purchaseS - wasteS);
   }, [item.transactions]);
+
+  const daecheonASReceiptSum = useMemo(() => {
+    return item.transactions
+      .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천AS')
+      .reduce((acc, t) => acc + t.quantity, 0);
+  }, [item.transactions]);
+
+  const isDaecheonWasteError = useMemo(() => {
+    return daecheonWasteSum > (daecheonReleaseSum - daecheonASReceiptSum);
+  }, [daecheonWasteSum, daecheonReleaseSum, daecheonASReceiptSum]);
+
+  const isDaecheonReceiptProblem = useMemo(() => {
+    return daecheonASReceiptSum > daecheonReleaseSum;
+  }, [daecheonASReceiptSum, daecheonReleaseSum]);
+
+  const daecheonASSum = useMemo(() => {
+    return Math.max(0, daecheonReleaseSum - daecheonASReceiptSum - daecheonWasteSum);
+  }, [daecheonReleaseSum, daecheonASReceiptSum, daecheonWasteSum]);
 
   const isSerialDuplicate = useMemo(() => (!serialNumber.trim() || serialNumber.includes('~')) ? false : allUsedSerials.includes(serialNumber.toUpperCase()), [serialNumber, allUsedSerials]);
   const isCodeDuplicate = useMemo(() => (!editFormData.code || editFormData.code === item.code) ? false : existingCodes.some(c => c.toUpperCase() === editFormData.code?.toUpperCase()), [editFormData.code, existingCodes, item.code]);
@@ -281,10 +308,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
     const isPurchase = transactionType === 'purchase';
+    const isDaecheonSpecial = !isPurchase && (customerName?.trim() === '대천AS' || customerName?.trim() === '대천폐기');
     
-    let targetSerials: string[] = isPurchase ? [] : [serialNumber.toUpperCase().trim()];
+    let targetSerials: string[] = (isPurchase || isDaecheonSpecial) ? [] : [serialNumber.toUpperCase().trim()];
     let isRange = false;
-    if (!isPurchase && item.type === 'product' && serialNumber.includes('~')) {
+    if (!isPurchase && !isDaecheonSpecial && item.type === 'product' && serialNumber.includes('~')) {
       try { 
         targetSerials = parseSerialRange(serialNumber.toUpperCase()); 
         isRange = true; 
@@ -294,13 +322,32 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       }
     }
     
-    if (!isPurchase) {
+    if (!isPurchase && !isDaecheonSpecial) {
       const duplicates = targetSerials.filter(s => !!s && allUsedSerials.includes(s));
       if (duplicates.length > 0) { alert(`중복 번호 존재: ${duplicates.slice(0, 5).join(', ')}...`); return; }
     }
     
     const count = isRange ? targetSerials.length : (parseInt(quantity, 10) || 0);
     if (count <= 0) { alert('수량을 확인하세요.'); return; }
+    
+    // Validate Daecheon Special constraints
+    if (transactionType === 'purchase' && customerName?.trim() === '대천폐기') {
+      alert('입고(구매) 시 대천폐기를 입력할 수 없습니다. 대천폐기는 출고(폐기) 시에만 적용 가능합니다.');
+      return;
+    }
+    if (transactionType === 'release' && customerName?.trim() === '대천폐기') {
+      if (count > daecheonASSum) {
+        alert(`대천폐기 수량(${count} EA)이 현재 대천AS 수량(${daecheonASSum} EA)보다 많아 출고(폐기)할 수 없습니다.`);
+        return;
+      }
+    }
+    if (transactionType === 'purchase' && customerName?.trim() === '대천AS') {
+      if (count > daecheonASSum) {
+        alert(`대천AS 입고수량(${count} EA)이 현재 대천AS 수량(${daecheonASSum} EA)보다 많아 입고할 수 없습니다.`);
+        return;
+      }
+    }
+
     if (transactionType === 'release' && count > currentStock) { alert('재고 부족!'); return; }
     
     if (isRange) {
@@ -332,12 +379,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       onAddTransaction(item.id, { 
         type: transactionType, quantity: count, date: new Date().toISOString(), 
         remarks: transRemarks, modelName: transModelName, userId: transUserId, 
-        serialNumber: (!isPurchase && item.type === 'product') ? serialNumber.toUpperCase() : '', 
+        serialNumber: (!isPurchase && item.type === 'product' && !isDaecheonSpecial) ? serialNumber.toUpperCase() : '', 
         customerName: (item.type === 'product') ? customerName : '', 
-        address: (item.type === 'product') ? address : '', 
-        phoneNumber: (item.type === 'product') ? phoneNumber : '',
-        priceType: (!isPurchase && item.type === 'product') ? priceType : undefined,
-        unitPrice: (!isPurchase && item.type === 'product') ? currentPrice : undefined
+        address: (item.type === 'product' && !isDaecheonSpecial) ? address : '', 
+        phoneNumber: (item.type === 'product' && !isDaecheonSpecial) ? phoneNumber : '',
+        priceType: (!isPurchase && item.type === 'product' && !isDaecheonSpecial) ? priceType : undefined,
+        unitPrice: (!isPurchase && item.type === 'product' && !isDaecheonSpecial) ? currentPrice : undefined
       });
     }
     
@@ -345,7 +392,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     setTransRemarks(''); 
     setTransModelName(''); 
     setTransUserId(''); 
-    setSerialNumber(isPurchase ? '' : suggestNextSerial([...allUsedSerials, ...targetSerials])); 
+    setSerialNumber(isPurchase ? '' : (isDaecheonSpecial ? '' : suggestNextSerial([...allUsedSerials, ...targetSerials]))); 
     setCustomerName(''); 
     setAddress(''); 
     setPhoneNumber('');
@@ -357,7 +404,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     if (password !== requiredPass) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
-    else if (currentAction?.type === 'trans_save' && currentAction.targetId) onUpdateTransaction(item.id, currentAction.targetId, transEditData), setEditingTransactionId(null);
+    else if (currentAction?.type === 'trans_save' && currentAction.targetId) {
+      const isDaecheonSpec = transEditData.type === 'release' && (transEditData.customerName?.trim() === '대천AS' || transEditData.customerName?.trim() === '대천폐기');
+      const updatedTransEditData = {
+        ...transEditData,
+        priceType: isDaecheonSpec ? undefined : transEditData.priceType,
+        unitPrice: isDaecheonSpec ? undefined : transEditData.unitPrice,
+        serialNumber: isDaecheonSpec ? '' : transEditData.serialNumber,
+        address: isDaecheonSpec ? '' : transEditData.address,
+        phoneNumber: isDaecheonSpec ? '' : transEditData.phoneNumber
+      };
+      onUpdateTransaction(item.id, currentAction.targetId, updatedTransEditData);
+      setEditingTransactionId(null);
+    }
     else if (currentAction?.type === 'trans_delete' && currentAction.targetId) onDeleteTransaction(item.id, currentAction.targetId);
     else if (currentAction?.type === 'batch_delete') {
       selectedTransIds.forEach(id => {
@@ -408,6 +467,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const handleSaveTransEdit = (id: string) => {
     const originalTrans = item.transactions.find(t => t.id === id);
     const updatedData = { ...transEditData };
+    
+    // Validate Daecheon Special constraints on edit
+    if (updatedData.type === 'purchase' && updatedData.customerName?.trim() === '대천폐기') {
+      alert('입고(구매) 시 대천폐기를 입력할 수 없습니다. 대천폐기는 출고(폐기) 시에만 적용 가능합니다.');
+      return;
+    }
     
     // If serial number changed, store the original one
     if (originalTrans && transEditData.serialNumber && transEditData.serialNumber !== originalTrans.serialNumber) {
@@ -509,6 +574,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     link.click();
   };
 
+  const isDaecheonSpecial = transactionType === 'release' && (customerName?.trim() === '대천AS' || customerName?.trim() === '대천폐기');
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] sm:max-w-[90vw] flex flex-col h-full max-h-[98vh] sm:max-h-[95vh] overflow-hidden animate-fade-in-up">
@@ -554,11 +621,21 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </div>
               <div className="flex flex-col items-center">
                 <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">대천AS</span>
-                <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{daecheonASSum}</div>
+                <div className={`border ${isDaecheonReceiptProblem ? 'border-red-600 bg-red-50 text-red-600 animate-pulse' : 'border-rose-500 bg-white text-slate-800'} px-3 py-1 rounded-md font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm`}>{daecheonASSum}</div>
+                {isDaecheonReceiptProblem && (
+                  <span className="text-[8px] sm:text-[9px] text-red-600 font-black mt-1 text-center bg-red-50 border border-red-200 px-1 py-0.5 rounded">
+                    문제 (입고수량이 많음)
+                  </span>
+                )}
               </div>
               <div className="flex flex-col items-center">
                 <span className="text-rose-600 text-[10px] sm:text-xs font-black tracking-widest mb-0.5 uppercase">대천폐기</span>
-                <div className="border border-rose-500 bg-white px-3 py-1 rounded-md text-slate-800 font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm">{daecheonWasteSum}</div>
+                <div className={`border ${isDaecheonWasteError ? 'border-red-600 bg-red-50 text-red-600 animate-pulse' : 'border-rose-500 bg-white text-slate-800'} px-3 py-1 rounded-md font-extrabold text-xs sm:text-sm min-w-[50px] sm:min-w-[65px] text-center shadow-sm`}>{daecheonWasteSum}</div>
+                {isDaecheonWasteError && (
+                  <span className="text-[8px] sm:text-[9px] text-red-600 font-black mt-1 text-center bg-red-50 border border-red-200 px-1 py-0.5 rounded">
+                    잘못됨 (폐기수량이 많음)
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -694,14 +771,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><PlusIcon className="w-4 h-4 sm:w-5 sm:h-5"/> 입출고 기록</h3>
                   <form onSubmit={handleAddTransaction} className="space-y-4 sm:space-y-5">
                       <div className="flex p-1 bg-slate-100 rounded-xl">
-                          <button type="button" onClick={() => setTransactionType('purchase')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${transactionType === 'purchase' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>입고</button>
-                          <button type="button" onClick={() => setTransactionType('release')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${transactionType === 'release' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400'}`}>출고</button>
+                          <button type="button" onClick={() => {
+                            setTransactionType('purchase');
+                            if (customerName?.trim() === '대천폐기') {
+                              setCustomerName('');
+                            }
+                          }} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-[10px] md:text-sm font-black rounded-lg transition-all ${transactionType === 'purchase' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>입고</button>
+                          <button type="button" onClick={() => setTransactionType('release')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-[10px] md:text-sm font-black rounded-lg transition-all ${transactionType === 'release' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400'}`}>출고</button>
                       </div>
                       <div className="space-y-3 sm:space-y-4">
                         {item.type === 'product' ? (
                           transactionType === 'release' ? (
                             <>
-                              {showPrice && (
+                              {showPrice && !isDaecheonSpecial && (
                                 <div className="flex p-1 bg-slate-100 rounded-xl text-xs font-black">
                                   <button
                                     type="button"
@@ -719,40 +801,110 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                   </button>
                                 </div>
                               )}
-                              <div className="relative">
-                                  <div className="flex justify-between items-center mb-1.5">
-                                    <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest">일련번호 (범위: SN001~010)</label>
-                                    <button type="button" onClick={() => setSerialNumber(suggestNextSerial(allUsedSerials))} className="text-[8px] sm:text-[10px] font-black text-indigo-600 underline">제안</button>
-                                  </div>
-                                  <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="예: AJP00001~00005" className={`w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 rounded-xl font-black outline-none ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
-                              </div>
+                              {isDaecheonSpecial ? (
+                                <div className="p-3 sm:p-4 bg-amber-50 border-2 border-dashed border-amber-200 rounded-xl text-center">
+                                  <p className="text-xs sm:text-sm font-black text-amber-700">
+                                    "{customerName}" 출고 시에는 일련번호를 제외하고 수량만 기록합니다.
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="relative">
+                                    <div className="flex justify-between items-center mb-1.5">
+                                      <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest">일련번호 (범위: SN001~010)</label>
+                                      <button type="button" onClick={() => setSerialNumber(suggestNextSerial(allUsedSerials))} className="text-[8px] sm:text-[10px] font-black text-indigo-600 underline">제안</button>
+                                    </div>
+                                    <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value.toUpperCase())} placeholder="예: AJP00001~00005" className={`w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 rounded-xl font-black outline-none ${isSerialDuplicate ? 'border-rose-400 bg-rose-50' : 'border-slate-100'}`} />
+                                </div>
+                              )}
                               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                   <div className="relative">
                                     <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
+                                    {transactionType === 'release' && customerName?.trim() === '대천폐기' && (Number(quantity) || 0) > daecheonASSum && (
+                                      <span className="block text-[10px] text-red-600 font-black mt-1 bg-red-50 p-1 rounded border border-red-200">
+                                        잘못됨: 폐기수량이 많음 (대천AS 수량: {daecheonASSum} EA)
+                                      </span>
+                                    )}
                                   </div>
-                                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                                  <div className="relative">
+                                    <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {(['대천AS', '대천공장'] as const).map((name) => (
+                                        <button
+                                          key={name}
+                                          type="button"
+                                          onClick={() => setCustomerName(name)}
+                                          className={`px-1.5 py-0.5 text-[9px] sm:text-[10px] font-black rounded border transition-all cursor-pointer ${
+                                            customerName === name
+                                              ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                          }`}
+                                        >
+                                          {name}
+                                        </button>
+                                      ))}
+                                      {customerName && !['대천AS', '대천공장'].includes(customerName) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setCustomerName('')}
+                                          className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-black rounded border bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 transition-all cursor-pointer"
+                                        >
+                                          지우기
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
                               </div>
                               <input type="text" value={transUserId} onChange={(e) => setTransUserId(e.target.value)} placeholder="아이디" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                               <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="연락처" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                               <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="배송 주소" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
                             </>
                           ) : (
-                            <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">입고 수량 *</label>
-                                  <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
-                                </div>
-                                <div>
-                                  <label className="block text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">대상자 / 고객명</label>
-                                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">아이디</label>
-                                <input type="text" value={transUserId} onChange={(e) => setTransUserId(e.target.value)} placeholder="아이디" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
-                              </div>
-                            </div>
+                             <div className="space-y-3">
+                               <div className="grid grid-cols-2 gap-3">
+                                 <div>
+                                   <label className="block text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">입고 수량 *</label>
+                                   <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="수량 *" min="1" required className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-black outline-none focus:border-indigo-400" />
+                                   {transactionType === 'purchase' && customerName?.trim() === '대천AS' && (Number(quantity) || 0) > daecheonASSum && (
+                                     <span className="block text-[10px] text-red-600 font-black mt-1 bg-red-50 p-1 rounded border border-red-200">
+                                       문제: 입고수량이 많음 (대천AS 수량: {daecheonASSum} EA)
+                                     </span>
+                                   )}
+                                 </div>
+                                 <div>
+                                   <label className="block text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">대상자 / 고객명</label>
+                                   <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="대상자/고객명" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                                   <div className="flex flex-wrap gap-1 mt-1.5">
+                                     {(['대천AS', '대천폐기', '대천공장'] as const).map((name) => (
+                                       <button
+                                         key={name}
+                                         type="button"
+                                         onClick={() => setCustomerName(name)}
+                                         className={`px-1.5 py-0.5 text-[9px] sm:text-[10px] font-black rounded border transition-all cursor-pointer ${
+                                           customerName === name
+                                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                             : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                         }`}
+                                       >
+                                         {name}
+                                       </button>
+                                     ))}
+                                     {customerName && !['대천AS', '대천폐기', '대천공장'].includes(customerName) && (
+                                       <button
+                                         type="button"
+                                         onClick={() => setCustomerName('')}
+                                         className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-black rounded border bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 transition-all cursor-pointer"
+                                       >
+                                         지우기
+                                       </button>
+                                     )}
+                                   </div>
+                                 </div>
+                               </div>
+                               <div>
+                                 <label className="block text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">아이디</label>
+                                 <input type="text" value={transUserId} onChange={(e) => setTransUserId(e.target.value)} placeholder="아이디" className="w-full px-4 py-2.5 sm:py-3 text-base sm:text-lg border-2 border-slate-100 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                               </div>
+                             </div>
                           )
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -906,7 +1058,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                               <span className={`font-black text-sm sm:text-lg ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'} ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
                                                 {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
                                               </span>
-                                              {showPrice && t.type === 'release' && (
+                                              {showPrice && t.type === 'release' && !['대천AS', '대천폐기', '대천공장', '대천'].includes(t.customerName?.trim() || '') && (
                                                 <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-500 whitespace-nowrap">
                                                   {(((t.unitPrice !== undefined && t.unitPrice !== 0) ? t.unitPrice : (t.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0))) * t.quantity).toLocaleString()}원
                                                   <span className="text-[8px] text-slate-400 font-bold ml-1">
