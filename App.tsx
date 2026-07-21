@@ -58,7 +58,14 @@ const generateId = (prefix: string) => {
 const calculateStock = (item: Item): number => {
   return item.transactions.reduce((acc, t) => {
     if (t.isDiscarded) return acc;
-    return t.type === 'purchase' ? acc + t.quantity : acc - t.quantity;
+    if (t.type === 'release') {
+      if (t.customerName && t.customerName.trim() === '대천폐기') {
+        return acc;
+      }
+      return acc - t.quantity;
+    } else {
+      return acc + t.quantity;
+    }
   }, 0);
 };
 
