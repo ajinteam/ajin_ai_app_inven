@@ -411,11 +411,16 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {releaseList.map((r, i) => (
-                      <tr key={i} className="bg-white">
-                        <td className="px-4 py-3 font-black text-indigo-600">{r.brand}</td>
-                        <td className="px-4 py-3 font-bold text-slate-700">{r.name}</td>
-                        <td className="px-4 py-3 font-black">{r.quantity} EA</td>
+                    {releaseList.map((r, i) => {
+                      const productItem = items.find(it => it.id === r.itemId);
+                      const productCode = productItem?.code;
+                      return (
+                        <tr key={i} className="bg-white">
+                          <td className="px-4 py-3 font-black text-indigo-600">{r.brand}</td>
+                          <td className="px-4 py-3 font-bold text-slate-700">
+                            {productCode ? `[${productCode}] ` : ''}{r.name}
+                          </td>
+                          <td className="px-4 py-3 font-black">{r.quantity} EA</td>
                         <td className="px-4 py-3 font-bold">
                           <div className="flex flex-col">
                             {showPrice ? (
@@ -433,7 +438,8 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                           <button onClick={() => handleRemoveFromList(i)} className="p-2 text-rose-400 hover:bg-rose-50 rounded-lg"><TrashIcon className="w-4 h-4" /></button>
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </div>
