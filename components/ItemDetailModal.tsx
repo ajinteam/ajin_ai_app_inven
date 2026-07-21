@@ -211,7 +211,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const releaseSum = useMemo(() => {
     const totalRelease = item.transactions
-      .filter(t => t.type === 'release' && !t.isDiscarded)
+      .filter(t => t.type === 'release' && !t.isDiscarded && t.customerName?.trim() !== '대천폐기')
       .reduce((acc, t) => acc + t.quantity, 0);
     const daecheonASReturn = item.transactions
       .filter(t => t.type === 'purchase' && !t.isDiscarded && t.customerName && t.customerName.trim() === '대천AS')
