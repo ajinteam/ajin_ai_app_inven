@@ -1008,7 +1008,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                             <tbody className="divide-y-2 divide-white">
                                 {filteredHistory.map(t => (
                                     <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''} ${t.isReturned ? 'bg-amber-50/30' : ''}`}>
-                                        <td className="px-2 sm:px-4 py-3 sm:py-4">
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap min-w-[120px] sm:min-w-[140px]">
                                           <div className="flex items-center gap-2 sm:gap-3">
                                             {editingTransactionId === t.id && authRole === 'admin' ? (
                                               <select
