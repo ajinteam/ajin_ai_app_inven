@@ -119,6 +119,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   // History Search State
   const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [showReturnDetailModal, setShowReturnDetailModal] = useState<Transaction | null>(null);
 
   useEffect(() => {
     const isDaecheonSpecial = transactionType === 'release' && (customerName === '대천AS' || customerName === '대천폐기');
@@ -452,7 +453,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     } else setIsEditing(true);
   };
 
-  const handleTransEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTransEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const processedValue = (name === 'quantity') ? (parseInt(value, 10) || 0) : 
                            (name === 'date') ? (value ? new Date(value).toISOString() : new Date().toISOString()) :
@@ -1117,20 +1118,51 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 sm:py-4">
                                               {editingTransactionId === t.id ? (
-                                                <input name="address" value={transEditData.address || ''} onChange={handleTransEditChange} placeholder="주소" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
+                                                <textarea
+                                                  name="address"
+                                                  value={transEditData.address || ''}
+                                                  onChange={handleTransEditChange}
+                                                  placeholder="주소 입력"
+                                                  rows={2}
+                                                  className="w-full min-w-[180px] sm:min-w-[220px] p-2 border-2 border-indigo-200 focus:border-indigo-500 rounded-xl font-bold text-[10px] sm:text-xs bg-white outline-none resize-y transition-all shadow-sm"
+                                                />
                                               ) : (
-                                                <p className={`text-slate-500 font-bold text-[8px] sm:text-[10px] truncate max-w-[80px] sm:max-w-[120px] ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`} title={t.address}>{t.address || '-'}</p>
+                                                <p className={`text-slate-600 font-bold text-[10px] sm:text-xs min-w-[140px] max-w-[200px] sm:max-w-[260px] whitespace-pre-wrap break-words leading-relaxed ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`} title={t.address}>
+                                                  {t.address || '-'}
+                                                </p>
                                               )}
                                             </td>
                                           </>
                                         )}
                                           <td className="px-2 sm:px-4 py-3 sm:py-4">
                                             {editingTransactionId === t.id ? (
-                                              <input name="remarks" value={transEditData.remarks || ''} onChange={handleTransEditChange} placeholder="비고" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
+                                              <textarea
+                                                name="remarks"
+                                                value={transEditData.remarks || ''}
+                                                onChange={handleTransEditChange}
+                                                placeholder="비고 입력 (반품/복원 사유 등)"
+                                                rows={2}
+                                                className="w-full min-w-[200px] sm:min-w-[260px] p-2 border-2 border-indigo-200 focus:border-indigo-500 rounded-xl font-bold text-[10px] sm:text-xs bg-white outline-none resize-y transition-all shadow-sm"
+                                              />
                                             ) : (
-                                              <div className="flex flex-col">
-                                                {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest mb-0.5">폐기</span>}
-                                                <p className={`text-[8px] sm:text-[10px] text-slate-400 font-black whitespace-pre-wrap break-all ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.remarks || '-'}</p>
+                                              <div className="flex flex-col gap-1 min-w-[160px] max-w-[240px] sm:max-w-[320px]">
+                                                {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest w-fit bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">폐기됨</span>}
+                                                {t.isReturned && <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest w-fit bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">반품 보관중</span>}
+                                                {t.isResold && <span className="text-[8px] font-black text-sky-700 uppercase tracking-widest w-fit bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">재판매 완료</span>}
+                                                
+                                                <p className={`text-[10px] sm:text-xs text-slate-700 font-bold whitespace-pre-wrap break-words leading-relaxed ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
+                                                  {t.remarks || '-'}
+                                                </p>
+
+                                                {(t.returnReason || t.isReturned || t.isResold || t.originalSerialNumber || t.originalCustomerName || (t.remarks && (t.remarks.includes('반품:') || t.remarks.includes('복원:')))) && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setShowReturnDetailModal(t)}
+                                                    className="mt-1 inline-flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg w-fit transition-all cursor-pointer shadow-sm hover:shadow"
+                                                  >
+                                                    <span>📋 반품/이력 상세</span>
+                                                  </button>
+                                                )}
                                               </div>
                                             )}
                                           </td>
@@ -1304,6 +1336,93 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div className="grid grid-cols-2 gap-4 mt-4">
                 <button onClick={() => setShowReturnModal(null)} className="py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm tracking-widest">취소</button>
                 <button onClick={handleReturnSubmit} className="py-4 bg-amber-500 text-white rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-amber-100">반품 처리</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReturnDetailModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[90] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-100 animate-fade-in-up">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h4 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">반품 및 거래 상세 이력</h4>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Return & Transaction Detail History</p>
+              </div>
+              <button onClick={() => setShowReturnDetailModal(null)} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition-all cursor-pointer">
+                <CloseIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 space-y-2.5 text-xs">
+                <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                  <span className="text-slate-500 font-bold">품목 정보</span>
+                  <span className="font-black text-slate-800">[{item.code}] {item.name}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                  <span className="text-slate-500 font-bold">거래 일시</span>
+                  <span className="font-bold text-slate-700">{new Date(showReturnDetailModal.date).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                  <span className="text-slate-500 font-bold">거래 구분 / 수량</span>
+                  <span className="font-black text-indigo-600">{showReturnDetailModal.type === 'purchase' ? '입고' : '출고'} ({showReturnDetailModal.quantity} EA)</span>
+                </div>
+                {showReturnDetailModal.serialNumber && (
+                  <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                    <span className="text-slate-500 font-bold">현재 일련번호</span>
+                    <span className="font-mono font-black text-indigo-600">{showReturnDetailModal.serialNumber}</span>
+                  </div>
+                )}
+                {showReturnDetailModal.originalSerialNumber && (
+                  <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                    <span className="text-slate-500 font-bold">이전 일련번호</span>
+                    <span className="font-mono font-bold text-rose-500 line-through">{showReturnDetailModal.originalSerialNumber}</span>
+                  </div>
+                )}
+                {showReturnDetailModal.customerName && (
+                  <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                    <span className="text-slate-500 font-bold">현재 고객명</span>
+                    <span className="font-black text-slate-800">{showReturnDetailModal.customerName}</span>
+                  </div>
+                )}
+                {showReturnDetailModal.originalCustomerName && (
+                  <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                    <span className="text-slate-500 font-bold">이전 고객명</span>
+                    <span className="font-bold text-rose-500 line-through">{showReturnDetailModal.originalCustomerName}</span>
+                  </div>
+                )}
+                {showReturnDetailModal.address && (
+                  <div className="flex justify-between items-start border-b border-slate-200/50 pb-2">
+                    <span className="text-slate-500 font-bold shrink-0">배송 주소</span>
+                    <span className="font-bold text-slate-700 text-right max-w-[240px] whitespace-pre-wrap leading-relaxed">{showReturnDetailModal.address}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 반품 사유 섹션 */}
+              {showReturnDetailModal.returnReason && (
+                <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200">
+                  <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest block mb-1">🏷️ 등록된 반품 사유</span>
+                  <p className="text-xs font-extrabold text-amber-900 whitespace-pre-wrap">{showReturnDetailModal.returnReason}</p>
+                </div>
+              )}
+
+              {/* 비고 전체 내용 */}
+              <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 space-y-1">
+                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-1">📝 비고 (전체 이력 및 상황)</span>
+                <p className="text-xs font-bold text-slate-800 whitespace-pre-wrap break-all leading-relaxed">{showReturnDetailModal.remarks || '등록된 비고가 없습니다.'}</p>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReturnDetailModal(null)}
+                  className="w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer shadow-md"
+                >
+                  닫기
+                </button>
               </div>
             </div>
           </div>
