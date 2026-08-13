@@ -321,8 +321,14 @@ export default function DateSalesSearchModal({
                       <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase tracking-wider border border-indigo-100">
                         {item.category || '-'}
                       </span>
-                      <p className="font-black text-slate-800 text-xs sm:text-sm mt-1.5 leading-snug">{item.name}</p>
-                      <p className="text-[9px] font-mono text-slate-400 font-bold mt-0.5">{item.code}</p>
+                      <div className="flex flex-col mt-1.5">
+                        {item.code && (
+                          <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded w-fit mb-1 border border-indigo-100">
+                            [{item.code}]
+                          </span>
+                        )}
+                        <p className="font-black text-slate-800 text-xs sm:text-sm leading-snug">{item.name}</p>
+                      </div>
                     </div>
                     <div className="text-right">
                       <span className="text-[10px] font-mono font-bold text-slate-400 block">
@@ -448,8 +454,14 @@ export default function DateSalesSearchModal({
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <p className="font-black text-slate-800 text-xs sm:text-sm">{item.name}</p>
-                          <p className="text-[9px] font-mono text-slate-400 font-bold mt-0.5">{item.code}</p>
+                          <div className="flex flex-col">
+                            {item.code && (
+                              <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded w-fit mb-1 border border-indigo-100">
+                                [{item.code}]
+                              </span>
+                            )}
+                            <p className="font-black text-slate-800 text-xs sm:text-sm">{item.name}</p>
+                          </div>
                         </td>
                         <td className="px-6 py-4 font-mono text-xs font-black text-indigo-600">
                           {transaction.originalSerialNumber && (

@@ -314,8 +314,14 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase tracking-wider border border-indigo-100">
                             {r.itemBrand}
                           </span>
-                          <h4 className="font-black text-slate-800 text-sm mt-1.5 leading-snug">{r.itemName}</h4>
-                          <p className="text-[9px] font-mono text-slate-400 font-bold mt-0.5">{r.itemCode || ''}</p>
+                          <div className="flex flex-col mt-1.5">
+                            {r.itemCode && (
+                              <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded w-fit mb-1 border border-indigo-100">
+                                [{r.itemCode}]
+                              </span>
+                            )}
+                            <h4 className="font-black text-slate-800 text-sm leading-snug">{r.itemName}</h4>
+                          </div>
                         </div>
                         <div className="text-right shrink-0">
                           <span className="text-[10px] font-mono font-bold text-slate-400 block">
@@ -410,7 +416,16 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           <tr key={r.id || i} className="hover:bg-indigo-50/30 transition-colors">
                             <td className="px-6 py-6 font-bold text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
                             <td className="px-6 py-6 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
-                            <td className="px-6 py-6 font-black text-slate-800">{r.itemName}</td>
+                            <td className="px-6 py-6">
+                              <div className="flex flex-col">
+                                {r.itemCode && (
+                                  <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded w-fit mb-1 border border-indigo-100">
+                                    [{r.itemCode}]
+                                  </span>
+                                )}
+                                <span className="font-black text-slate-800 text-xs sm:text-sm">{r.itemName}</span>
+                              </div>
+                            </td>
                             <td className="px-6 py-6 font-mono font-black text-indigo-400">
                               {r.originalSerialNumber && (
                                 <span className="text-[10px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1 block mb-0.5">{r.originalSerialNumber}</span>
@@ -480,7 +495,14 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[8px] font-black uppercase tracking-wider border border-indigo-100">
                                 {r.itemBrand}
                               </span>
-                              <h5 className="font-black text-slate-800 text-xs mt-1.5 leading-snug">{r.itemName}</h5>
+                              <div className="flex flex-col mt-1.5">
+                                {r.itemCode && (
+                                  <span className="text-[9px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded w-fit mb-0.5 border border-indigo-100">
+                                    [{r.itemCode}]
+                                  </span>
+                                )}
+                                <h5 className="font-black text-slate-800 text-xs leading-snug">{r.itemName}</h5>
+                              </div>
                             </div>
                             <div className="text-right shrink-0">
                               {r.serialNumber && (
@@ -547,7 +569,16 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           {group.list.map((r, idx) => (
                             <tr key={r.id || idx} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-4 py-3 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
-                              <td className="px-4 py-3 font-black text-slate-800">{r.itemName}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-col">
+                                  {r.itemCode && (
+                                    <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded w-fit mb-0.5 border border-indigo-100">
+                                      [{r.itemCode}]
+                                    </span>
+                                  )}
+                                  <span className="font-black text-slate-800 text-xs sm:text-sm">{r.itemName}</span>
+                                </div>
+                              </td>
                               <td className="px-4 py-3 font-mono font-black text-indigo-400">{r.serialNumber || '-'}</td>
                               {showPrice && (
                                 <td className="px-4 py-3 text-right text-slate-500 font-bold">
