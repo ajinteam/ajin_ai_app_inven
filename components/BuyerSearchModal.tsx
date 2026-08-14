@@ -160,7 +160,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           <div>
             <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
               <SearchIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
-              구매자 및 매출 검색
+              구매자 검색
             </h2>
             <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">이름, 아이디 또는 날짜로 모든 판매 내역을 조회합니다.</p>
           </div>
@@ -385,9 +385,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                       )}
 
                       {r.remarks && (
-                        <div className="pt-2 border-t border-slate-50 text-[10px] text-slate-450 font-bold">
-                          <span className="text-[8px] text-slate-300 block uppercase tracking-wider">비고</span>
-                          <p className="mt-0.5 italic">{r.remarks}</p>
+                        <div className="pt-2.5 border-t border-slate-100 text-xs">
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider mb-1">비고</span>
+                          <div className="font-medium text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100/80 whitespace-pre-wrap break-words text-xs leading-relaxed">
+                            {r.remarks}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -454,7 +456,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-6 text-[10px] text-slate-400 font-bold max-w-[200px] truncate" title={r.remarks}>{r.remarks || '-'}</td>
+                            <td className="px-6 py-6 text-xs text-slate-700 font-medium min-w-[200px] max-w-[400px]">
+                              {r.remarks ? (
+                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-100 whitespace-pre-wrap break-words leading-relaxed text-xs text-slate-700 font-medium">
+                                  {r.remarks}
+                                </div>
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -541,9 +551,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           )}
 
                           {r.remarks && (
-                            <div className="pt-2 border-t border-slate-100/60 text-[9px] text-slate-400">
-                              <span className="text-[8px] text-slate-300 block uppercase tracking-wider">비고</span>
-                              <p className="italic mt-0.5">{r.remarks}</p>
+                            <div className="pt-2 border-t border-slate-100/60 text-xs">
+                              <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider mb-1">비고</span>
+                              <div className="font-medium text-slate-700 bg-white p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap break-words text-xs leading-relaxed">
+                                {r.remarks}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -595,7 +607,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                                 <p className="font-black text-slate-900 text-xs">{r.customerName || '-'}</p>
                                 {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
                               </td>
-                              <td className="px-4 py-3 text-slate-400 font-medium max-w-[150px] truncate" title={r.remarks}>{r.remarks || '-'}</td>
+                              <td className="px-4 py-3 text-xs text-slate-700 font-medium min-w-[180px] max-w-[350px]">
+                                {r.remarks ? (
+                                  <div className="bg-slate-50/90 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap break-words leading-relaxed text-xs text-slate-700 font-medium">
+                                    {r.remarks}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300">-</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -673,9 +693,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           )}
 
                           {r.remarks && (
-                            <div className="pt-2 border-t border-slate-100/60 text-[9px] text-slate-400">
-                              <span className="text-[8px] text-slate-300 block uppercase tracking-wider">비고</span>
-                              <p className="italic mt-0.5">{r.remarks}</p>
+                            <div className="pt-2 border-t border-slate-100/60 text-xs">
+                              <span className="text-[8px] text-slate-400 font-bold block uppercase tracking-wider mb-1">비고</span>
+                              <div className="font-medium text-slate-700 bg-white p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap break-words text-xs leading-relaxed">
+                                {r.remarks}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -716,7 +738,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                                 <p className="font-black text-slate-900 text-xs">{r.customerName || '-'}</p>
                                 {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
                               </td>
-                              <td className="px-4 py-3 text-slate-400 font-medium max-w-[150px] truncate" title={r.remarks}>{r.remarks || '-'}</td>
+                              <td className="px-4 py-3 text-xs text-slate-700 font-medium min-w-[180px] max-w-[350px]">
+                                {r.remarks ? (
+                                  <div className="bg-slate-50/90 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap break-words leading-relaxed text-xs text-slate-700 font-medium">
+                                    {r.remarks}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300">-</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
