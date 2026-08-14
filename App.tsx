@@ -48,8 +48,6 @@ const detectDateInSearch = (text: string): string | null => {
 const STORAGE_KEY = 'inventory_system_data_v2';
 const USERS_STORAGE_KEY = 'inventory_system_users_v2';
 const ADMIN_PASSWORD = 'aj5200';
-const ADMIN_PASSWORD_ALT = '5200';
-const ADMIN_PASSWORDS = ['aj5200', '5200'];
 const PRODUCT_ONLY_PASSWORD = '2611';
 
 let idCounter = 0;
@@ -411,9 +409,9 @@ const App: React.FC = () => {
     e.preventDefault();
     
     const checkCredentials = (password: string, userList: User[]) => {
-      if (ADMIN_PASSWORDS.includes(password)) {
+      if (password === ADMIN_PASSWORD) {
         setAuthRole('admin');
-        setCurrentUser({ id: 'admin', name: 'ADMINISTRATOR', password: password, partPermission: 'edit', productPermission: 'edit', showPricePermission: true });
+        setCurrentUser({ id: 'admin', name: 'ADMINISTRATOR', password: ADMIN_PASSWORD, partPermission: 'edit', productPermission: 'edit', showPricePermission: true });
         setActiveTab('part');
         return true;
       } else if (password === PRODUCT_ONLY_PASSWORD) {
@@ -424,13 +422,8 @@ const App: React.FC = () => {
       } else {
         const foundUser = userList.find(u => u.password === password);
         if (foundUser) {
-          if (ADMIN_PASSWORDS.includes(foundUser.password)) {
-            setAuthRole('admin');
-            setCurrentUser({ ...foundUser, partPermission: 'edit', productPermission: 'edit', showPricePermission: true });
-          } else {
-            setAuthRole('custom');
-            setCurrentUser(foundUser);
-          }
+          setAuthRole('custom');
+          setCurrentUser(foundUser);
           if (foundUser.partPermission !== 'none') setActiveTab('part');
           else if (foundUser.productPermission !== 'none') setActiveTab('product');
           return true;
@@ -494,9 +487,10 @@ const App: React.FC = () => {
   };
 
   const handleDeleteItemConfirm = () => {
-    const isPassValid = authRole === 'admin' 
-      ? ADMIN_PASSWORDS.includes(deletePassword) 
-      : (deletePassword === currentUser?.password);
+    const isPassValid = 
+      (authRole === 'admin' && deletePassword === ADMIN_PASSWORD) ||
+      (deletePassword === ADMIN_PASSWORD) ||
+      (deletePassword === currentUser?.password);
     if (!isPassValid) {
       alert('비밀번호가 틀렸습니다.');
       return;
@@ -1317,6 +1311,7 @@ const App: React.FC = () => {
         <ItemDetailModal 
           item={selectedItem} 
           authRole={authRole as any} 
+          currentUser={currentUser}
           allUsedSerials={allUsedSerials} 
           existingCodes={items.map(i => i.code)}
           onAddTransaction={handleAddTransaction} 

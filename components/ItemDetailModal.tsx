@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Item, Transaction } from '../types';
+import type { Item, Transaction, User } from '../types';
 import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, TrashIcon, DownloadIcon, PlusIcon, SyncIcon, SearchIcon } from './icons';
 
 interface ItemDetailModalProps {
   item: Item;
   authRole: 'admin' | 'product_only' | 'custom' | null;
+  currentUser?: User | null;
   allUsedSerials: string[];
   existingCodes: string[];
   onAddTransaction: (itemId: string, transaction: Omit<Transaction, 'id'>) => void;
@@ -17,8 +18,7 @@ interface ItemDetailModalProps {
   showPrice?: boolean;
 }
 
-const ADMIN_PASSWORD = '5200';
-const ADMIN_PASSWORDS = ['aj5200', '5200'];
+const ADMIN_PASSWORD = 'aj5200';
 const PRODUCT_ONLY_PASSWORD = '2611';
 
 const suggestNextSerial = (usedSerials: string[], prefix: string = 'AJP'): string => {
@@ -89,7 +89,7 @@ const toLocalDatetimeString = (dateStr: string | number | undefined): string => 
 };
 
 const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ 
-  item, authRole, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
+  item, authRole, currentUser, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
 }) => {
   const [transactionType, setTransactionType] = useState<'purchase' | 'release'>('purchase');
   const [quantity, setQuantity] = useState('');
@@ -108,6 +108,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [editFormData, setEditFormData] = useState<Partial<Item>>({});
   const [selectedTransIds, setSelectedTransIds] = useState<string[]>([]);
   const [priceType, setPriceType] = useState<'general' | 'agency'>('general');
+
+  const canEdit = useMemo(() => {
+    if (authRole === 'admin') return true;
+    if (authRole === 'product_only' && item.type === 'product') return true;
+    if (currentUser) {
+      const perm = item.type === 'part' ? currentUser.partPermission : currentUser.productPermission;
+      return perm === 'edit';
+    }
+    return false;
+  }, [authRole, currentUser, item.type]);
   
   const [showReturnModal, setShowReturnModal] = useState<{ itemId: string, transactionId?: string, transactionIds?: string[] } | null>(null);
   const [returnReason, setReturnReason] = useState('도장불량');
@@ -404,9 +414,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
   
   const handleActionConfirm = () => {
-    const isPassValid = authRole === 'admin' 
-      ? ADMIN_PASSWORDS.includes(password) 
-      : (password === '2611' || ADMIN_PASSWORDS.includes(password));
+    const isPassValid = 
+      (authRole === 'admin' && (password === ADMIN_PASSWORD || (currentUser && password === currentUser.password))) ||
+      (password === ADMIN_PASSWORD) ||
+      (currentUser && password === currentUser.password) ||
+      (authRole === 'product_only' && password === PRODUCT_ONLY_PASSWORD);
     if (!isPassValid) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
@@ -441,6 +453,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
 
   const handleBatchDelete = () => {
+    if (!canEdit) {
+      alert('삭제 권한이 없습니다.');
+      return;
+    }
     if (selectedTransIds.length === 0) {
       alert('삭제할 품목을 선택해주세요.');
       return;
@@ -451,6 +467,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
 
   const handleToggleEdit = () => {
+    if (!canEdit) {
+      alert('편집 권한이 없습니다.');
+      return;
+    }
     if (isEditing) {
         if (!editFormData.name || !editFormData.code) { alert('필수 항목 누락.'); return; }
         if (isCodeDuplicate) { alert('중복 코드.'); return; }
@@ -588,13 +608,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] sm:max-w-[90vw] flex flex-col h-full max-h-[98vh] sm:max-h-[95vh] overflow-hidden animate-fade-in-up">
         {showPasswordInput && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl sm:rounded-[2.5rem] p-8 sm:p-12 max-w-md w-full shadow-2xl border border-slate-100 animate-fade-in-up">
                     <h4 className="text-xl sm:text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">권한 인증</h4>
+                    <p className="text-xs font-bold text-slate-500 mb-4">비밀번호를 입력하여 저장을 완료하세요.</p>
                     <input type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleActionConfirm()} placeholder="PASSWORD" className="w-full px-4 sm:px-6 py-4 sm:py-5 border-2 border-slate-100 rounded-xl sm:rounded-2xl focus:border-indigo-500 outline-none mb-6 text-center text-2xl sm:text-3xl font-black tracking-widest" />
                     <div className="grid grid-cols-2 gap-4">
-                        <button onClick={() => { setShowPasswordInput(null); setPassword(''); }} className="py-3 sm:py-4 bg-slate-100 text-slate-600 rounded-lg sm:rounded-xl font-black uppercase text-xs sm:text-sm tracking-widest">취소</button>
-                        <button onClick={handleActionConfirm} className="py-3 sm:py-4 bg-indigo-600 text-white rounded-lg sm:rounded-xl font-black uppercase text-xs sm:text-sm tracking-widest shadow-lg shadow-indigo-100">확인</button>
+                        <button onClick={() => { setShowPasswordInput(null); setPassword(''); }} className="py-3 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg sm:rounded-xl font-black uppercase text-xs sm:text-sm tracking-widest cursor-pointer">취소</button>
+                        <button onClick={handleActionConfirm} className="py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg sm:rounded-xl font-black uppercase text-xs sm:text-sm tracking-widest shadow-lg shadow-indigo-100 cursor-pointer">확인</button>
                     </div>
                 </div>
             </div>
@@ -648,10 +669,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             </div>
           </div>
           <div className="flex gap-2 sm:gap-4 w-full md:w-auto justify-end">
-              <button id="detail_edit_btn" onClick={handleToggleEdit} className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black transition-all shadow-sm ${isEditing ? 'bg-emerald-500 text-white' : 'bg-white text-indigo-600 border-2 border-indigo-50'}`}>
-                {isEditing ? <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <EditIcon className="w-4 h-4 sm:w-5 sm:h-5" />}
-                <span className="hidden xs:inline">{isEditing ? '저장' : '정보 수정'}</span>
-              </button>
+              {canEdit && (
+                <button id="detail_edit_btn" onClick={handleToggleEdit} className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black transition-all shadow-sm ${isEditing ? 'bg-emerald-500 text-white' : 'bg-white text-indigo-600 border-2 border-indigo-50'}`}>
+                  {isEditing ? <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <EditIcon className="w-4 h-4 sm:w-5 sm:h-5" />}
+                  <span className="hidden xs:inline">{isEditing ? '저장' : '정보 수정'}</span>
+                </button>
+              )}
               {isEditing && <button id="detail_cancel_btn" onClick={() => setIsEditing(false)} className="px-3 sm:px-6 py-2 sm:py-3 bg-slate-100 text-slate-600 rounded-xl sm:rounded-2xl text-[10px] sm:text-base font-black uppercase">취소</button>}
               <button id="detail_close_btn" onClick={onClose} className="p-1 sm:p-3 text-slate-400 hover:text-slate-800 transition-colors ml-1 sm:ml-4"><CloseIcon className="w-8 h-8 sm:w-10 sm:h-10" /></button>
           </div>
@@ -774,7 +797,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <p className="text-5xl sm:text-7xl font-black text-slate-900 leading-none text-center sm:text-left">{currentStock.toLocaleString()} <span className="text-xl sm:text-2xl text-slate-300 font-black uppercase">EA</span></p>
               </div>
             </div>
-            {!isEditing && (
+            {!isEditing && canEdit && (
               <div className="bg-white p-5 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 shadow-xl space-y-4 sm:space-y-5">
                   <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><PlusIcon className="w-4 h-4 sm:w-5 sm:h-5"/> 입출고 기록</h3>
                   <form onSubmit={handleAddTransaction} className="space-y-4 sm:space-y-5">
@@ -926,6 +949,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                         {serialNumber.includes('~') ? '일괄 저장' : '데이터 저장' }
                       </button>
                   </form>
+              </div>
+            )}
+            {!isEditing && !canEdit && (
+              <div className="bg-slate-50 p-6 rounded-2xl sm:rounded-[2rem] border border-slate-200 text-center">
+                <p className="text-sm font-black text-slate-500">읽기 전용 모드입니다 (수정 권한 없음)</p>
               </div>
             )}
             </div>
@@ -1141,15 +1169,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                                 )}
                                               </>
                                             )}
-                                            <button 
-                                              onClick={() => handleEditTransaction(t)} 
-                                              title="내역 수정 및 비고 입력"
-                                              className="p-1.5 sm:p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
-                                            >
-                                              <EditIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                                            </button>
-                                            {/* Only Admin can delete transactions */}
-                                            {authRole === 'admin' && (
+                                            {canEdit && (
+                                              <button 
+                                                onClick={() => handleEditTransaction(t)} 
+                                                title="내역 수정 및 비고 입력"
+                                                className="p-1.5 sm:p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                                              >
+                                                <EditIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                                              </button>
+                                            )}
+                                            {canEdit && (
                                               <button onClick={() => handleDeleteTrans(t.id)} title="삭제" className="p-1.5 sm:p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer">
                                                 <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                                               </button>
@@ -1309,7 +1338,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60">
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">거래 구분</label>
-                  {authRole === 'admin' ? (
+                  {canEdit ? (
                     <select
                       name="type"
                       value={transEditData.type || 'purchase'}
@@ -1342,7 +1371,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">거래 일시</label>
-                  {authRole === 'admin' ? (
+                  {canEdit ? (
                     <input
                       type="datetime-local"
                       name="date"
