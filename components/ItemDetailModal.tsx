@@ -1,12 +1,11 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Item, Transaction, User } from '../types';
+import type { Item, Transaction } from '../types';
 import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, TrashIcon, DownloadIcon, PlusIcon, SyncIcon, SearchIcon } from './icons';
 
 interface ItemDetailModalProps {
   item: Item;
   authRole: 'admin' | 'product_only' | 'custom' | null;
-  currentUser?: User | null;
   allUsedSerials: string[];
   existingCodes: string[];
   onAddTransaction: (itemId: string, transaction: Omit<Transaction, 'id'>) => void;
@@ -19,7 +18,7 @@ interface ItemDetailModalProps {
 }
 
 const ADMIN_PASSWORD = '5200';
-const ADMIN_PASSWORD_ALT = 'aj5200';
+const ADMIN_PASSWORDS = ['aj5200', '5200'];
 const PRODUCT_ONLY_PASSWORD = '2611';
 
 const suggestNextSerial = (usedSerials: string[], prefix: string = 'AJP'): string => {
@@ -90,7 +89,7 @@ const toLocalDatetimeString = (dateStr: string | number | undefined): string => 
 };
 
 const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ 
-  item, authRole, currentUser, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
+  item, authRole, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
 }) => {
   const [transactionType, setTransactionType] = useState<'purchase' | 'release'>('purchase');
   const [quantity, setQuantity] = useState('');
@@ -122,6 +121,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   // History Search State
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [showReturnDetailModal, setShowReturnDetailModal] = useState<Transaction | null>(null);
+  const [showTransEditModal, setShowTransEditModal] = useState<Transaction | null>(null);
 
   useEffect(() => {
     const isDaecheonSpecial = transactionType === 'release' && (customerName === '대천AS' || customerName === '대천폐기');
@@ -404,18 +404,10 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
   
   const handleActionConfirm = () => {
-    const isAdminPass = password === ADMIN_PASSWORD || password === ADMIN_PASSWORD_ALT || password === 'aj5200' || password === '5200';
-    const isProductOnlyPass = password === PRODUCT_ONLY_PASSWORD || password === '2611';
-    const isCurrentUserPass = !!currentUser?.password && password === currentUser.password;
-    
-    const isAuthorized = authRole === 'admin' 
-      ? (isAdminPass || isCurrentUserPass) 
-      : (isAdminPass || isProductOnlyPass || isCurrentUserPass);
-
-    if (!isAuthorized) {
-      alert('비밀번호 오류.');
-      return;
-    }
+    const isPassValid = authRole === 'admin' 
+      ? ADMIN_PASSWORDS.includes(password) 
+      : (password === '2611' || ADMIN_PASSWORDS.includes(password));
+    if (!isPassValid) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
     else if (currentAction?.type === 'trans_save' && currentAction.targetId) {
@@ -430,6 +422,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       };
       onUpdateTransaction(item.id, currentAction.targetId, updatedTransEditData);
       setEditingTransactionId(null);
+      setShowTransEditModal(null);
     }
     else if (currentAction?.type === 'trans_delete' && currentAction.targetId) onDeleteTransaction(item.id, currentAction.targetId);
     else if (currentAction?.type === 'batch_delete') {
@@ -475,7 +468,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const handleEditTransaction = (t: Transaction) => {
     setEditingTransactionId(t.id);
-    setTransEditData(t);
+    setTransEditData({ ...t });
+    setShowTransEditModal(t);
   };
 
   const handleSaveTransEdit = (id: string) => {
@@ -1019,216 +1013,146 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                             </thead>
                             <tbody className="divide-y-2 divide-white">
                                 {filteredHistory.map(t => (
-                                    <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''} ${t.isReturned ? 'bg-amber-50/30' : ''}`}>
+                                    <tr key={t.id} className={`hover:bg-white transition-all group ${t.isDiscarded ? 'bg-rose-50/30' : ''} ${t.isReturned ? 'bg-amber-50/30' : ''}`}>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap min-w-[120px] sm:min-w-[140px]">
                                           <div className="flex items-center gap-2 sm:gap-3">
-                                            {editingTransactionId === t.id && (authRole === 'admin' || currentUser?.partPermission === 'edit' || currentUser?.productPermission === 'edit') ? (
-                                              <select
-                                                name="type"
-                                                value={transEditData.type || 'purchase'}
-                                                onChange={(e) => {
-                                                  const val = e.target.value as 'purchase' | 'release';
-                                                  setTransEditData(prev => ({ ...prev, type: val }));
-                                                }}
-                                                className="px-1 py-0.5 border-2 border-indigo-200 rounded-lg bg-white font-extrabold text-[10px] text-slate-700 outline-none focus:border-indigo-500 cursor-pointer"
-                                              >
-                                                <option value="purchase">입고</option>
-                                                <option value="release">출고</option>
-                                              </select>
-                                            ) : (
-                                              <div 
-                                                onClick={() => handleToggleSelectTrans(t.id)}
-                                                className={`p-1.5 sm:p-2 rounded-lg cursor-pointer transition-all duration-200 transform active:scale-95 hover:scale-105 select-none ${
-                                                  selectedTransIds.includes(t.id)
-                                                    ? (t.type === 'purchase' ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300' : 'bg-rose-600 text-white shadow-md ring-2 ring-rose-300')
-                                                    : (t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-rose-100 text-rose-600 hover:bg-rose-200')
-                                                }`}
-                                                title="선택하려면 클릭하세요"
-                                              >
-                                                {t.type === 'purchase' ? <ArrowUpIcon className="w-3 h-3 sm:w-4 sm:h-4"/> : <ArrowDownIcon className="w-3 h-3 sm:w-4 sm:h-4"/>}
-                                              </div>
-                                            )}
-                                            {editingTransactionId === t.id && authRole === 'admin' ? (
-                                              <input
-                                                type="datetime-local"
-                                                name="date"
-                                                value={toLocalDatetimeString(transEditData.date)}
-                                                onChange={handleTransEditChange}
-                                                className="px-2 py-1 border-2 rounded-lg bg-white font-bold text-[10px] sm:text-xs"
-                                              />
-                                            ) : (
-                                              <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
-                                                <p className="font-black text-slate-700 text-[10px] sm:text-sm">{new Date(t.date).toLocaleDateString()}</p>
-                                                <p className="text-[8px] text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                                              </div>
-                                            )}
+                                            <div 
+                                              onClick={() => handleToggleSelectTrans(t.id)}
+                                              className={`p-1.5 sm:p-2 rounded-lg cursor-pointer transition-all duration-200 transform active:scale-95 hover:scale-105 select-none ${
+                                                selectedTransIds.includes(t.id)
+                                                  ? (t.type === 'purchase' ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300' : 'bg-rose-600 text-white shadow-md ring-2 ring-rose-300')
+                                                  : (t.type === 'purchase' ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-rose-100 text-rose-600 hover:bg-rose-200')
+                                              }`}
+                                              title="선택하려면 클릭하세요"
+                                            >
+                                              {t.type === 'purchase' ? <ArrowUpIcon className="w-3 h-3 sm:w-4 sm:h-4"/> : <ArrowDownIcon className="w-3 h-3 sm:w-4 sm:h-4"/>}
+                                            </div>
+                                            <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
+                                              <p className="font-black text-slate-700 text-[10px] sm:text-sm">{new Date(t.date).toLocaleDateString()}</p>
+                                              <p className="text-[8px] text-slate-400 font-bold">{new Date(t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                            </div>
                                           </div>
                                         </td>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                          {editingTransactionId === t.id ? (
-                                            <input name="quantity" type="number" value={transEditData.quantity} onChange={handleTransEditChange} className="w-16 sm:w-20 px-2 py-1 border-2 rounded-lg bg-white font-black text-xs sm:text-base" />
-                                          ) : (
-                                            <div className="flex flex-col">
-                                              <span className={`font-black text-sm sm:text-lg ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'} ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
-                                                {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
-                                              </span>
-                                              {showPrice && t.type === 'release' && !['대천AS', '대천폐기', '대천공장', '대천'].includes(t.customerName?.trim() || '') && (
-                                                <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-500 whitespace-nowrap">
-                                                  {(((t.unitPrice !== undefined && t.unitPrice !== 0) ? t.unitPrice : (t.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0))) * t.quantity).toLocaleString()}원
-                                                  <span className="text-[8px] text-slate-400 font-bold ml-1">
-                                                    ({t.priceType === 'agency' ? '대리점' : '일반'})
-                                                  </span>
+                                          <div className="flex flex-col">
+                                            <span className={`font-black text-sm sm:text-lg ${t.type === 'purchase' ? 'text-emerald-600' : 'text-rose-600'} ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
+                                              {t.type === 'purchase' ? '+' : '-'}{t.quantity.toLocaleString()}
+                                            </span>
+                                            {showPrice && t.type === 'release' && !['대천AS', '대천폐기', '대천공장', '대천'].includes(t.customerName?.trim() || '') && (
+                                              <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-500 whitespace-nowrap">
+                                                {(((t.unitPrice !== undefined && t.unitPrice !== 0) ? t.unitPrice : (t.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0))) * t.quantity).toLocaleString()}원
+                                                <span className="text-[8px] text-slate-400 font-bold ml-1">
+                                                  ({t.priceType === 'agency' ? '대리점' : '일반'})
                                                 </span>
-                                              )}
-                                            </div>
-                                          )}
+                                              </span>
+                                            )}
+                                          </div>
                                         </td>
                                         {item.type === 'part' && (
                                           <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                            {editingTransactionId === t.id ? (
-                                              <input name="modelName" value={transEditData.modelName || ''} onChange={handleTransEditChange} className="w-20 sm:w-24 px-2 py-1 border-2 rounded-lg bg-white text-xs" />
-                                            ) : (
-                                              <span className={`font-black text-slate-600 text-[10px] sm:text-xs ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.modelName || '-'}</span>
-                                            )}
+                                            <span className={`font-black text-slate-600 text-[10px] sm:text-xs ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.modelName || '-'}</span>
                                           </td>
                                         )}
                                         {item.type === 'product' && (
                                           <>
                                             <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                              {editingTransactionId === t.id ? (
-                                                <input name="serialNumber" value={transEditData.serialNumber || ''} onChange={handleTransEditChange} className="w-20 sm:w-24 px-2 py-1 border-2 rounded-lg bg-white font-black uppercase text-[10px]" />
-                                              ) : (
+                                              <div className="flex flex-col">
+                                                {t.originalSerialNumber && (
+                                                  <span className="text-[8px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1">{t.originalSerialNumber}</span>
+                                                )}
+                                                <span className={`font-mono font-black text-indigo-600 text-[10px] sm:text-sm ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.serialNumber || '-'}</span>
+                                              </div>
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-3 sm:py-4">
+                                              <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
                                                 <div className="flex flex-col">
-                                                  {t.originalSerialNumber && (
-                                                    <span className="text-[8px] text-rose-500 line-through font-mono font-bold decoration-rose-500 decoration-1">{t.originalSerialNumber}</span>
+                                                  {t.originalCustomerName && (
+                                                    <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{t.originalCustomerName}</span>
                                                   )}
-                                                  <span className={`font-mono font-black text-indigo-600 text-[10px] sm:text-sm ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>{t.serialNumber || '-'}</span>
-                                                </div>
-                                              )}
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                              {editingTransactionId === t.id ? (
-                                                <div className="space-y-1">
-                                                  <input name="customerName" value={transEditData.customerName || ''} onChange={handleTransEditChange} placeholder="이름" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
-                                                  <input name="userId" value={transEditData.userId || ''} onChange={handleTransEditChange} placeholder="ID" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
-                                                  <input name="phoneNumber" value={transEditData.phoneNumber || ''} onChange={handleTransEditChange} placeholder="번호" className="w-full px-2 py-1 border-2 rounded-lg text-[10px]" />
-                                                </div>
-                                              ) : (
-                                                <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
-                                                  <div className="flex flex-col">
-                                                    {t.originalCustomerName && (
-                                                      <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{t.originalCustomerName}</span>
-                                                    )}
-                                                    <div className="flex items-center gap-1">
-                                                      <p className="font-black text-slate-800 text-[10px] sm:text-sm">{t.customerName || '-'}</p>
-                                                      {t.userId && <span className="bg-slate-100 text-slate-500 text-[6px] sm:text-[8px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
-                                                    </div>
+                                                  <div className="flex items-center gap-1">
+                                                    <p className="font-black text-slate-800 text-[10px] sm:text-sm">{t.customerName || '-'}</p>
+                                                    {t.userId && <span className="bg-slate-100 text-slate-500 text-[6px] sm:text-[8px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
                                                   </div>
-                                                  <p className="text-slate-400 font-bold text-[8px] sm:text-[10px] mt-1">{t.phoneNumber || '-'}</p>
                                                 </div>
-                                              )}
+                                                <p className="text-slate-400 font-bold text-[8px] sm:text-[10px] mt-1">{t.phoneNumber || '-'}</p>
+                                              </div>
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                              {editingTransactionId === t.id ? (
-                                                <textarea
-                                                  name="address"
-                                                  value={transEditData.address || ''}
-                                                  onChange={handleTransEditChange}
-                                                  placeholder="주소 입력"
-                                                  rows={2}
-                                                  className="w-full min-w-[180px] sm:min-w-[220px] p-2 border-2 border-indigo-200 focus:border-indigo-500 rounded-xl font-bold text-[10px] sm:text-xs bg-white outline-none resize-y transition-all shadow-sm"
-                                                />
-                                              ) : (
-                                                <p className={`text-slate-600 font-bold text-[10px] sm:text-xs min-w-[140px] max-w-[200px] sm:max-w-[260px] whitespace-pre-wrap break-words leading-relaxed ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`} title={t.address}>
-                                                  {t.address || '-'}
-                                                </p>
-                                              )}
+                                              <p className={`text-slate-600 font-bold text-[10px] sm:text-xs min-w-[140px] max-w-[200px] sm:max-w-[260px] whitespace-pre-wrap break-words leading-relaxed ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`} title={t.address}>
+                                                {t.address || '-'}
+                                              </p>
                                             </td>
                                           </>
                                         )}
-                                          <td className="px-2 sm:px-4 py-3 sm:py-4 min-w-[240px] sm:min-w-[320px] pr-6">
-                                            {editingTransactionId === t.id ? (
-                                              <div className="w-full">
-                                                <textarea
-                                                  name="remarks"
-                                                  value={transEditData.remarks || ''}
-                                                  onChange={handleTransEditChange}
-                                                  placeholder="비고 입력 (반품/복원 사유 등)"
-                                                  rows={3}
-                                                  className="w-full p-2.5 border-2 border-indigo-300 focus:border-indigo-600 rounded-xl font-bold text-[11px] sm:text-xs bg-white outline-none resize-y transition-all shadow-md focus:ring-2 focus:ring-indigo-100"
-                                                />
-                                              </div>
-                                            ) : (
-                                              <div className="flex flex-col gap-1 min-w-[160px] max-w-[240px] sm:max-w-[320px]">
-                                                {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest w-fit bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">폐기됨</span>}
-                                                {t.isReturned && <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest w-fit bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">반품 보관중</span>}
-                                                {t.isResold && <span className="text-[8px] font-black text-sky-700 uppercase tracking-widest w-fit bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">재판매 완료</span>}
-                                                
-                                                <p className={`text-[10px] sm:text-xs text-slate-700 font-bold whitespace-pre-wrap break-words leading-relaxed ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
-                                                  {t.remarks || '-'}
-                                                </p>
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4">
+                                          <div className="flex flex-col gap-1 min-w-[160px] max-w-[240px] sm:max-w-[320px]">
+                                            {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest w-fit bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">폐기됨</span>}
+                                            {t.isReturned && <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest w-fit bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">반품 보관중</span>}
+                                            {t.isResold && <span className="text-[8px] font-black text-sky-700 uppercase tracking-widest w-fit bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">재판매 완료</span>}
+                                            
+                                            <p className={`text-[10px] sm:text-xs text-slate-700 font-bold whitespace-pre-wrap break-words leading-relaxed ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
+                                              {t.remarks || '-'}
+                                            </p>
 
-                                                {(t.returnReason || t.isReturned || t.isResold || t.originalSerialNumber || t.originalCustomerName || (t.remarks && (t.remarks.includes('반품:') || t.remarks.includes('복원:')))) && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => setShowReturnDetailModal(t)}
-                                                    className="mt-1 inline-flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg w-fit transition-all cursor-pointer shadow-sm hover:shadow"
-                                                  >
-                                                    <span>📋 반품/이력 상세</span>
-                                                  </button>
-                                                )}
-                                              </div>
+                                            {(t.returnReason || t.isReturned || t.isResold || t.originalSerialNumber || t.originalCustomerName || (t.remarks && (t.remarks.includes('반품:') || t.remarks.includes('복원:')))) && (
+                                              <button
+                                                type="button"
+                                                onClick={() => setShowReturnDetailModal(t)}
+                                                className="mt-1 inline-flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg w-fit transition-all cursor-pointer shadow-sm hover:shadow"
+                                              >
+                                                <span>📋 반품/이력 상세</span>
+                                              </button>
                                             )}
-                                          </td>
-                                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-center sticky right-0 bg-white/95 group-hover:bg-white z-10 border-l-2 border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.04)] min-w-[90px]">
+                                          </div>
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-center sticky right-0 bg-inherit group-hover:bg-white z-10 border-l-2 border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">
                                           <div className="flex items-center justify-center gap-1 sm:gap-2 transition-opacity">
-                                            {editingTransactionId === t.id ? (
-                                              <>
-                                                <button onClick={() => handleSaveTransEdit(t.id)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"><CheckIcon className="w-5 h-5" /></button>
-                                                <button onClick={() => setEditingTransactionId(null)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-lg"><CloseIcon className="w-5 h-5" /></button>
-                                              </>
+                                            {t.isDiscarded ? (
+                                              <button 
+                                                onClick={() => onUpdateTransaction(item.id, t.id, { isDiscarded: false })}
+                                                className="px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[10px] font-black hover:bg-emerald-600 hover:text-white transition-all"
+                                              >
+                                                복구
+                                              </button>
                                             ) : (
                                               <>
-                                                {t.isDiscarded ? (
+                                                {t.type === 'release' && !t.isReturned && (
                                                   <button 
-                                                    onClick={() => onUpdateTransaction(item.id, t.id, { isDiscarded: false })}
-                                                    className="px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[10px] font-black hover:bg-emerald-600 hover:text-white transition-all"
+                                                    onClick={() => setShowReturnModal({ itemId: item.id, transactionId: t.id })}
+                                                    className="px-2 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded text-[10px] font-black hover:bg-amber-600 hover:text-white transition-all"
                                                   >
-                                                    복구
+                                                    반품
                                                   </button>
-                                                ) : (
-                                                  <>
-                                                    {t.type === 'release' && !t.isReturned && (
-                                                      <button 
-                                                        onClick={() => setShowReturnModal({ itemId: item.id, transactionId: t.id })}
-                                                        className="px-2 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded text-[10px] font-black hover:bg-amber-600 hover:text-white transition-all"
-                                                      >
-                                                        반품
-                                                      </button>
-                                                    )}
-                                                    {t.type === 'release' && t.isReturned && (
-                                                      <button 
-                                                        id={`detail_return_cancel_btn_${t.id}`}
-                                                        onClick={() => {
-                                                          setShowRestorePrompt({
-                                                            itemId: item.id,
-                                                            transactionId: t.id,
-                                                            originalRemarks: t.remarks || ''
-                                                          });
-                                                        }}
-                                                        className="px-2 py-1 bg-sky-50 text-sky-600 border border-sky-100 rounded text-[10px] font-black hover:bg-sky-600 hover:text-white transition-all whitespace-nowrap"
-                                                      >
-                                                        반품취소
-                                                      </button>
-                                                    )}
-                                                  </>
                                                 )}
-                                                <button onClick={() => handleEditTransaction(t)} className="p-2 text-indigo-400 hover:text-indigo-600 rounded-lg"><EditIcon className="w-4 h-4 sm:w-6 sm:h-6" /></button>
-                                                {/* Only Admin can delete transactions */}
-                                                {authRole === 'admin' && (
-                                                  <button onClick={() => handleDeleteTrans(t.id)} className="p-2 text-rose-400 hover:text-rose-600 rounded-lg"><TrashIcon className="w-4 h-4 sm:w-6 sm:h-6" /></button>
+                                                {t.type === 'release' && t.isReturned && (
+                                                  <button 
+                                                    id={`detail_return_cancel_btn_${t.id}`}
+                                                    onClick={() => {
+                                                      setShowRestorePrompt({
+                                                        itemId: item.id,
+                                                        transactionId: t.id,
+                                                        originalRemarks: t.remarks || ''
+                                                      });
+                                                    }}
+                                                    className="px-2 py-1 bg-sky-50 text-sky-600 border border-sky-100 rounded text-[10px] font-black hover:bg-sky-600 hover:text-white transition-all whitespace-nowrap"
+                                                  >
+                                                    반품취소
+                                                  </button>
                                                 )}
                                               </>
+                                            )}
+                                            <button 
+                                              onClick={() => handleEditTransaction(t)} 
+                                              title="내역 수정 및 비고 입력"
+                                              className="p-1.5 sm:p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                                            >
+                                              <EditIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                                            </button>
+                                            {/* Only Admin can delete transactions */}
+                                            {authRole === 'admin' && (
+                                              <button onClick={() => handleDeleteTrans(t.id)} title="삭제" className="p-1.5 sm:p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer">
+                                                <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                                              </button>
                                             )}
                                           </div>
                                         </td>
@@ -1351,6 +1275,221 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <button onClick={() => setShowReturnModal(null)} className="py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm tracking-widest">취소</button>
                 <button onClick={handleReturnSubmit} className="py-4 bg-amber-500 text-white rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-amber-100">반품 처리</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 전용 거래 수정 및 비고 입력 새창 모달 */}
+      {showTransEditModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[80] flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-[2rem] p-5 sm:p-8 max-w-xl w-full shadow-2xl border border-slate-100 animate-fade-in-up max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">수불 내역 수정 / 비고 입력</h4>
+                  <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black uppercase tracking-wider ${transEditData.type === 'purchase' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                    {transEditData.type === 'purchase' ? '입고 내역' : '출고 내역'}
+                  </span>
+                </div>
+                <p className="text-xs font-bold text-slate-400 mt-1">[{item.code}] {item.name}</p>
+              </div>
+              <button 
+                onClick={() => { setShowTransEditModal(null); setEditingTransactionId(null); }}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <CloseIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <div className="overflow-y-auto py-4 space-y-4 pr-1">
+              {/* 구분 & 수량 & 일시 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">거래 구분</label>
+                  {authRole === 'admin' ? (
+                    <select
+                      name="type"
+                      value={transEditData.type || 'purchase'}
+                      onChange={(e) => {
+                        const val = e.target.value as 'purchase' | 'release';
+                        setTransEditData(prev => ({ ...prev, type: val }));
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      <option value="purchase">입고 (+)</option>
+                      <option value="release">출고 (-)</option>
+                    </select>
+                  ) : (
+                    <div className="px-3 py-2 bg-white border border-slate-200 rounded-xl font-black text-xs text-slate-700">
+                      {transEditData.type === 'purchase' ? '입고 (+)' : '출고 (-)'}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">수량</label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={transEditData.quantity ?? ''}
+                    onChange={handleTransEditChange}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-black text-xs sm:text-sm text-slate-800 outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">거래 일시</label>
+                  {authRole === 'admin' ? (
+                    <input
+                      type="datetime-local"
+                      name="date"
+                      value={toLocalDatetimeString(transEditData.date)}
+                      onChange={handleTransEditChange}
+                      className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl font-bold text-[11px] text-slate-800 outline-none focus:border-indigo-500"
+                    />
+                  ) : (
+                    <div className="px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-[11px] text-slate-600 truncate">
+                      {transEditData.date ? new Date(transEditData.date).toLocaleString() : '-'}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 품목별 속성 */}
+              {item.type === 'part' && (
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">기종 정보</label>
+                  <input
+                    type="text"
+                    name="modelName"
+                    value={transEditData.modelName || ''}
+                    onChange={handleTransEditChange}
+                    placeholder="기종 정보 입력"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              )}
+
+              {item.type === 'product' && (
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60 space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                      일련번호 (Serial Number)
+                      {showTransEditModal.originalSerialNumber && (
+                        <span className="ml-2 text-rose-500 line-through text-[9px] font-mono font-bold">
+                          (이전: {showTransEditModal.originalSerialNumber})
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      name="serialNumber"
+                      value={transEditData.serialNumber || ''}
+                      onChange={handleTransEditChange}
+                      placeholder="예: AJP03288"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono font-black text-xs sm:text-sm text-indigo-600 uppercase outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                        고객명
+                        {showTransEditModal.originalCustomerName && (
+                          <span className="ml-1 text-rose-500 line-through text-[8px]">
+                            ({showTransEditModal.originalCustomerName})
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        type="text"
+                        name="customerName"
+                        value={transEditData.customerName || ''}
+                        onChange={handleTransEditChange}
+                        placeholder="고객 이름"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">아이디 (ID)</label>
+                      <input
+                        type="text"
+                        name="userId"
+                        value={transEditData.userId || ''}
+                        onChange={handleTransEditChange}
+                        placeholder="구매자 ID"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">연락처</label>
+                      <input
+                        type="text"
+                        name="phoneNumber"
+                        value={transEditData.phoneNumber || ''}
+                        onChange={handleTransEditChange}
+                        placeholder="010-0000-0000"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">배송 주소</label>
+                    <textarea
+                      name="address"
+                      value={transEditData.address || ''}
+                      onChange={handleTransEditChange}
+                      placeholder="상세 배송 주소를 입력하세요"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:border-indigo-500 resize-y leading-relaxed"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 비고 입력란 (크고 넓게 표시) */}
+              <div className="bg-indigo-50/70 p-4 rounded-2xl border border-indigo-100">
+                <label className="block text-[11px] font-black text-indigo-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>📝 비고 (사유, 메모, 특이사항 등)</span>
+                  <span className="text-[10px] text-indigo-400 font-normal">충분한 공간에서 편하게 작성 가능</span>
+                </label>
+                <textarea
+                  name="remarks"
+                  value={transEditData.remarks || ''}
+                  onChange={handleTransEditChange}
+                  placeholder="비고, 반품/교환/수리 사유, 특이사항 등을 상세히 입력하세요."
+                  rows={4}
+                  className="w-full p-3 bg-white border-2 border-indigo-200 focus:border-indigo-500 rounded-xl font-bold text-xs sm:text-sm text-slate-800 outline-none resize-y leading-relaxed shadow-sm transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="pt-4 border-t border-slate-100 flex gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => { setShowTransEditModal(null); setEditingTransactionId(null); }}
+                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (showTransEditModal) {
+                    handleSaveTransEdit(showTransEditModal.id);
+                  }
+                }}
+                className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md shadow-indigo-100 cursor-pointer"
+              >
+                수정 내용 저장
+              </button>
             </div>
           </div>
         </div>

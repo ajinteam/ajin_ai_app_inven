@@ -218,7 +218,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
                     users.map(u => (
                       <tr key={u.id} className={`hover:bg-slate-50/50 transition-colors ${editingUserId === u.id ? 'bg-amber-50/30' : ''}`}>
                         <td className="px-6 py-5 font-black text-slate-800 text-sm">{u.name}</td>
-                        <td className="px-6 py-5 font-mono font-black text-indigo-600 tracking-wider text-xs">{u.password}</td>
+                        <td className="px-6 py-5 font-mono font-black text-slate-400">****</td>
                         <td className="px-6 py-5">
                           <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${u.partPermission === 'none' ? 'bg-slate-100 text-slate-400' : u.partPermission === 'read' ? 'bg-indigo-50 text-indigo-600' : 'bg-indigo-600 text-white'}`}>
                             {u.partPermission === 'none' ? '권한없음' : u.partPermission === 'read' ? '읽기전용' : '편집권한'}
