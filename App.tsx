@@ -831,7 +831,7 @@ const App: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2 lg:flex-col lg:items-end lg:space-y-1">
                     {authRole === 'admin' && (
                       <button onClick={() => setShowUserManagementModal(true)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 text-[9px] font-black uppercase tracking-widest shadow-sm">
-                        사용자 및 권한 관리
+                        사용자 및 계정 관리
                       </button>
                     )}
                     <button onClick={handleLocalExport} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 text-[9px] font-black uppercase tracking-widest shadow-sm">
@@ -1308,6 +1308,7 @@ const App: React.FC = () => {
         <ItemDetailModal 
           item={selectedItem} 
           authRole={authRole as any} 
+          currentUser={currentUser}
           allUsedSerials={allUsedSerials} 
           existingCodes={items.map(i => i.code)}
           onAddTransaction={handleAddTransaction} 

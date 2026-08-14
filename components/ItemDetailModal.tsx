@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Item, Transaction } from '../types';
+import type { Item, Transaction, User } from '../types';
 import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, TrashIcon, DownloadIcon, PlusIcon, SyncIcon, SearchIcon } from './icons';
 
 interface ItemDetailModalProps {
   item: Item;
   authRole: 'admin' | 'product_only' | 'custom' | null;
+  currentUser?: User | null;
   allUsedSerials: string[];
   existingCodes: string[];
   onAddTransaction: (itemId: string, transaction: Omit<Transaction, 'id'>) => void;
@@ -18,6 +19,7 @@ interface ItemDetailModalProps {
 }
 
 const ADMIN_PASSWORD = '5200';
+const ADMIN_PASSWORD_ALT = 'aj5200';
 const PRODUCT_ONLY_PASSWORD = '2611';
 
 const suggestNextSerial = (usedSerials: string[], prefix: string = 'AJP'): string => {
@@ -88,7 +90,7 @@ const toLocalDatetimeString = (dateStr: string | number | undefined): string => 
 };
 
 const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ 
-  item, authRole, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
+  item, authRole, currentUser, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
 }) => {
   const [transactionType, setTransactionType] = useState<'purchase' | 'release'>('purchase');
   const [quantity, setQuantity] = useState('');
@@ -402,8 +404,18 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   };
   
   const handleActionConfirm = () => {
-    const requiredPass = authRole === 'admin' ? 'aj5200' : '2611' ;
-    if (password !== requiredPass) { alert('비밀번호 오류.'); return; }
+    const isAdminPass = password === ADMIN_PASSWORD || password === ADMIN_PASSWORD_ALT || password === 'aj5200' || password === '5200';
+    const isProductOnlyPass = password === PRODUCT_ONLY_PASSWORD || password === '2611';
+    const isCurrentUserPass = !!currentUser?.password && password === currentUser.password;
+    
+    const isAuthorized = authRole === 'admin' 
+      ? (isAdminPass || isCurrentUserPass) 
+      : (isAdminPass || isProductOnlyPass || isCurrentUserPass);
+
+    if (!isAuthorized) {
+      alert('비밀번호 오류.');
+      return;
+    }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
     if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
     else if (currentAction?.type === 'trans_save' && currentAction.targetId) {
@@ -1010,7 +1022,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                     <tr key={t.id} className={`hover:bg-white transition-all group ${editingTransactionId === t.id ? 'bg-indigo-50/50' : ''} ${t.isDiscarded ? 'bg-rose-50/30' : ''} ${t.isReturned ? 'bg-amber-50/30' : ''}`}>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap min-w-[120px] sm:min-w-[140px]">
                                           <div className="flex items-center gap-2 sm:gap-3">
-                                            {editingTransactionId === t.id && authRole === 'admin' ? (
+                                            {editingTransactionId === t.id && (authRole === 'admin' || currentUser?.partPermission === 'edit' || currentUser?.productPermission === 'edit') ? (
                                               <select
                                                 name="type"
                                                 value={transEditData.type || 'purchase'}
@@ -1134,16 +1146,18 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                             </td>
                                           </>
                                         )}
-                                          <td className="px-2 sm:px-4 py-3 sm:py-4">
+                                          <td className="px-2 sm:px-4 py-3 sm:py-4 min-w-[240px] sm:min-w-[320px] pr-6">
                                             {editingTransactionId === t.id ? (
-                                              <textarea
-                                                name="remarks"
-                                                value={transEditData.remarks || ''}
-                                                onChange={handleTransEditChange}
-                                                placeholder="비고 입력 (반품/복원 사유 등)"
-                                                rows={2}
-                                                className="w-full min-w-[200px] sm:min-w-[260px] p-2 border-2 border-indigo-200 focus:border-indigo-500 rounded-xl font-bold text-[10px] sm:text-xs bg-white outline-none resize-y transition-all shadow-sm"
-                                              />
+                                              <div className="w-full">
+                                                <textarea
+                                                  name="remarks"
+                                                  value={transEditData.remarks || ''}
+                                                  onChange={handleTransEditChange}
+                                                  placeholder="비고 입력 (반품/복원 사유 등)"
+                                                  rows={3}
+                                                  className="w-full p-2.5 border-2 border-indigo-300 focus:border-indigo-600 rounded-xl font-bold text-[11px] sm:text-xs bg-white outline-none resize-y transition-all shadow-md focus:ring-2 focus:ring-indigo-100"
+                                                />
+                                              </div>
                                             ) : (
                                               <div className="flex flex-col gap-1 min-w-[160px] max-w-[240px] sm:max-w-[320px]">
                                                 {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest w-fit bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">폐기됨</span>}
@@ -1166,7 +1180,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                               </div>
                                             )}
                                           </td>
-                                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-center sticky right-0 bg-inherit group-hover:bg-white z-10 border-l-2 border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-center sticky right-0 bg-white/95 group-hover:bg-white z-10 border-l-2 border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.04)] min-w-[90px]">
                                           <div className="flex items-center justify-center gap-1 sm:gap-2 transition-opacity">
                                             {editingTransactionId === t.id ? (
                                               <>
