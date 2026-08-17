@@ -355,6 +355,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                                     {r.userId}
                                   </span>
                                 )}
+                                {r.customerUpdatedDate && (
+                                  <span className="ml-1 bg-indigo-50 text-indigo-600 text-[8px] px-1 py-0.2 rounded font-bold border border-indigo-100/60" title={`구매자 정보 수정일: ${r.customerUpdatedDate}`}>
+                                    수정: {r.customerUpdatedDate}
+                                  </span>
+                                )}
                               </span>
                             </div>
                           </span>
@@ -450,9 +455,14 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                                 {r.originalCustomerName && (
                                   <span className="text-[10px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{r.originalCustomerName}</span>
                                 )}
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1 flex-wrap">
                                   <p className="font-black text-slate-900">{r.customerName || '-'}</p>
                                   {r.userId && <span className="bg-slate-100 text-slate-400 text-[9px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                  {r.customerUpdatedDate && (
+                                    <span className="bg-indigo-50 text-indigo-600 text-[8px] px-1.5 py-0.5 rounded font-bold border border-indigo-100/60" title={`구매자 정보 수정일: ${r.customerUpdatedDate}`}>
+                                      수정: {r.customerUpdatedDate}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -604,8 +614,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               )}
                               <td className="px-4 py-3 text-right font-black text-slate-900">{r.quantity} EA</td>
                               <td className="px-4 py-3">
-                                <p className="font-black text-slate-900 text-xs">{r.customerName || '-'}</p>
-                                {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <p className="font-black text-slate-900 text-xs">{r.customerName || '-'}</p>
+                                  {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                  {r.customerUpdatedDate && (
+                                    <span className="bg-indigo-50 text-indigo-600 text-[8px] px-1 py-0.2 rounded font-bold border border-indigo-100/60" title={`수정일: ${r.customerUpdatedDate}`}>
+                                      수정: {r.customerUpdatedDate}
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-4 py-3 text-xs text-slate-700 font-medium min-w-[180px] max-w-[350px]">
                                 {r.remarks ? (
@@ -671,6 +688,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               <span className="font-black text-slate-700">
                                 {r.customerName || '-'}
                                 {r.userId && <span className="ml-1 bg-slate-100 text-slate-450 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                {r.customerUpdatedDate && (
+                                  <span className="ml-1 bg-indigo-50 text-indigo-600 text-[8px] px-1 py-0.2 rounded font-bold border border-indigo-100/60" title={`수정일: ${r.customerUpdatedDate}`}>
+                                    수정: {r.customerUpdatedDate}
+                                  </span>
+                                )}
                               </span>
                             </div>
                             <div className="text-right">
@@ -735,8 +757,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               )}
                               <td className="px-4 py-3 text-right font-black text-slate-900">{r.quantity} EA</td>
                               <td className="px-4 py-3">
-                                <p className="font-black text-slate-900 text-xs">{r.customerName || '-'}</p>
-                                {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <p className="font-black text-slate-900 text-xs">{r.customerName || '-'}</p>
+                                  {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                  {r.customerUpdatedDate && (
+                                    <span className="bg-indigo-50 text-indigo-600 text-[8px] px-1 py-0.2 rounded font-bold border border-indigo-100/60" title={`수정일: ${r.customerUpdatedDate}`}>
+                                      수정: {r.customerUpdatedDate}
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-4 py-3 text-xs text-slate-700 font-medium min-w-[180px] max-w-[350px]">
                                 {r.remarks ? (

@@ -1102,7 +1102,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                                     {t.userId && <span className="bg-slate-100 text-slate-500 text-[6px] sm:text-[8px] font-black px-1 py-0.5 rounded uppercase">{t.userId}</span>}
                                                   </div>
                                                 </div>
-                                                <p className="text-slate-400 font-bold text-[8px] sm:text-[10px] mt-1">{t.phoneNumber || '-'}</p>
+                                                <div className="flex flex-col">
+                                                  <p className="text-slate-400 font-bold text-[8px] sm:text-[10px] mt-1">{t.phoneNumber || '-'}</p>
+                                                  {t.customerUpdatedDate && (
+                                                    <span className="text-[8px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100/80 w-fit mt-0.5" title={`구매자 정보 수정일: ${t.customerUpdatedDate}`}>
+                                                      수정: {t.customerUpdatedDate}
+                                                    </span>
+                                                  )}
+                                                </div>
                                               </div>
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 sm:py-4">
@@ -1404,6 +1411,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
               {item.type === 'product' && (
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">구매자 및 배송 정보</span>
+                    {transEditData.customerUpdatedDate ? (
+                      <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                        최근 정보수정: {transEditData.customerUpdatedDate}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-slate-400 font-medium">
+                        ※ 수정 시 동일 구매자 모든 구매내역 일괄 변경
+                      </span>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                       일련번호 (Serial Number)
@@ -1579,6 +1599,12 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   <div className="flex justify-between items-start border-b border-slate-200/50 pb-2">
                     <span className="text-slate-500 font-bold shrink-0">배송 주소</span>
                     <span className="font-bold text-slate-700 text-right max-w-[240px] whitespace-pre-wrap leading-relaxed">{showReturnDetailModal.address}</span>
+                  </div>
+                )}
+                {showReturnDetailModal.customerUpdatedDate && (
+                  <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                    <span className="text-slate-500 font-bold">구매자 정보 수정일</span>
+                    <span className="font-bold text-indigo-600 text-xs">{showReturnDetailModal.customerUpdatedDate}</span>
                   </div>
                 )}
               </div>

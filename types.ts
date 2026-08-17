@@ -11,6 +11,7 @@ export interface Transaction {
   address?: string; // 주소
   phoneNumber?: string; // 전화번호
   userId?: string; // 아이디 추가
+  customerUpdatedDate?: string; // 구매자 정보(아이디/연락처/주소 등) 수정일자
   returnReason?: string; // 반품 사유
   isReturned?: boolean; // 반품 여부
   isDiscarded?: boolean; // 폐기 여부

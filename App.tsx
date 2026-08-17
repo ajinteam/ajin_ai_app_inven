@@ -527,12 +527,65 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTransaction = (itemId: string, transactionId: string, updatedData: Partial<Transaction>) => {
-    setItems(prev => prev.map(item => {
-      if (item.id === itemId) {
-        return { ...item, transactions: item.transactions.map(t => t.id === transactionId ? { ...t, ...updatedData } : t) };
+    setItems(prev => {
+      // Find the target item and transaction
+      const targetItem = prev.find(item => item.id === itemId);
+      const targetTrans = targetItem?.transactions.find(t => t.id === transactionId);
+
+      const specialNames = ['대천AS', '대천폐기', '대천', '대천공장'];
+      const origCust = (targetTrans?.customerName || '').trim();
+      const origUser = (targetTrans?.userId || '').trim();
+      const isSpecial = specialNames.includes(origCust);
+
+      const isCustomerInfoChanged = !!targetTrans && !isSpecial && (origCust !== '' || origUser !== '') && (
+        (updatedData.customerName !== undefined && updatedData.customerName !== targetTrans.customerName) ||
+        (updatedData.userId !== undefined && updatedData.userId !== targetTrans.userId) ||
+        (updatedData.phoneNumber !== undefined && updatedData.phoneNumber !== targetTrans.phoneNumber) ||
+        (updatedData.address !== undefined && updatedData.address !== targetTrans.address)
+      );
+
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      if (isCustomerInfoChanged) {
+        const customerSyncData: Partial<Transaction> = {
+          customerUpdatedDate: todayStr,
+        };
+        if (updatedData.customerName !== undefined) customerSyncData.customerName = updatedData.customerName;
+        if (updatedData.userId !== undefined) customerSyncData.userId = updatedData.userId;
+        if (updatedData.phoneNumber !== undefined) customerSyncData.phoneNumber = updatedData.phoneNumber;
+        if (updatedData.address !== undefined) customerSyncData.address = updatedData.address;
+
+        return prev.map(item => ({
+          ...item,
+          transactions: item.transactions.map(t => {
+            if (t.id === transactionId && item.id === itemId) {
+              return { ...t, ...updatedData, customerUpdatedDate: todayStr };
+            }
+            // Same buyer release transactions across all items
+            const tCust = (t.customerName || '').trim();
+            const tUser = (t.userId || '').trim();
+            const isSameBuyer = t.type === 'release' && !specialNames.includes(tCust) && (
+              (origCust !== '' && tCust === origCust) ||
+              (origUser !== '' && tUser === origUser)
+            );
+            if (isSameBuyer) {
+              return { ...t, ...customerSyncData };
+            }
+            return t;
+          })
+        }));
       }
-      return item;
-    }));
+
+      return prev.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            transactions: item.transactions.map(t => t.id === transactionId ? { ...t, ...updatedData } : t)
+          };
+        }
+        return item;
+      });
+    });
   };
 
   const handleRestoreSubmit = () => {
