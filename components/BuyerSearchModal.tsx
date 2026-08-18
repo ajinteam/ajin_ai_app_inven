@@ -346,7 +346,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           <span className="font-black text-slate-800">
                             <div className="flex flex-col">
                               {r.originalCustomerName && (
-                                <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{r.originalCustomerName}</span>
+                                <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5" title={`이전 구매자: ${r.originalCustomerName}`}>(이전: {r.originalCustomerName})</span>
                               )}
                               <span>
                                 {r.customerName || '-'}
@@ -453,7 +453,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                             <td className="px-6 py-6">
                               <div className="flex flex-col">
                                 {r.originalCustomerName && (
-                                  <span className="text-[10px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{r.originalCustomerName}</span>
+                                  <span className="text-[10px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5" title={`이전 구매자: ${r.originalCustomerName}`}>(이전: {r.originalCustomerName})</span>
                                 )}
                                 <div className="flex items-center gap-1 flex-wrap">
                                   <p className="font-black text-slate-900">{r.customerName || '-'}</p>

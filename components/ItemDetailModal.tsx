@@ -11,7 +11,7 @@ interface ItemDetailModalProps {
   existingCodes: string[];
   onAddTransaction: (itemId: string, transaction: Omit<Transaction, 'id'>) => void;
   onAddTransactions?: (itemId: string, transactions: Omit<Transaction, 'id'>[]) => void;
-  onUpdateTransaction: (itemId: string, transactionId: string, updatedData: Partial<Transaction>) => void;
+  onUpdateTransaction: (itemId: string, transactionId: string, updatedData: Partial<Transaction>, options?: { syncBuyer?: boolean }) => void;
   onDeleteTransaction: (itemId: string, transactionId: string) => void;
   onUpdateItem: (itemId: string, updatedData: Partial<Item>) => void;
   onClose: () => void;
@@ -432,7 +432,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         address: isDaecheonSpec ? '' : transEditData.address,
         phoneNumber: isDaecheonSpec ? '' : transEditData.phoneNumber
       };
-      onUpdateTransaction(item.id, currentAction.targetId, updatedTransEditData);
+      onUpdateTransaction(item.id, currentAction.targetId, updatedTransEditData, { syncBuyer: true });
       setEditingTransactionId(null);
       setShowTransEditModal(null);
     }
@@ -505,6 +505,11 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     // If serial number changed, store the original one
     if (originalTrans && transEditData.serialNumber && transEditData.serialNumber !== originalTrans.serialNumber) {
       updatedData.originalSerialNumber = originalTrans.serialNumber;
+    }
+    
+    // If customer name changed, store the original one
+    if (originalTrans && transEditData.customerName && transEditData.customerName.trim() !== (originalTrans.customerName || '').trim()) {
+      updatedData.originalCustomerName = originalTrans.customerName;
     }
     
     setShowPasswordInput({ type: 'trans_save', targetId: id });
@@ -1095,7 +1100,9 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                               <div className={t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}>
                                                 <div className="flex flex-col">
                                                   {t.originalCustomerName && (
-                                                    <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5">{t.originalCustomerName}</span>
+                                                    <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5" title={`이전 구매자: ${t.originalCustomerName}`}>
+                                                      (이전: {t.originalCustomerName})
+                                                    </span>
                                                   )}
                                                   <div className="flex items-center gap-1">
                                                     <p className="font-black text-slate-800 text-[10px] sm:text-sm">{t.customerName || '-'}</p>
@@ -1448,8 +1455,8 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                         고객명
                         {showTransEditModal.originalCustomerName && (
-                          <span className="ml-1 text-rose-500 line-through text-[8px]">
-                            ({showTransEditModal.originalCustomerName})
+                          <span className="ml-1 text-rose-500 line-through text-[8px] font-bold">
+                            (이전: {showTransEditModal.originalCustomerName})
                           </span>
                         )}
                       </label>

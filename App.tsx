@@ -526,11 +526,20 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleUpdateTransaction = (itemId: string, transactionId: string, updatedData: Partial<Transaction>) => {
+  const handleUpdateTransaction = (
+    itemId: string, 
+    transactionId: string, 
+    updatedData: Partial<Transaction>,
+    options?: { syncBuyer?: boolean }
+  ) => {
     setItems(prev => {
       // Find the target item and transaction
       const targetItem = prev.find(item => item.id === itemId);
       const targetTrans = targetItem?.transactions.find(t => t.id === transactionId);
+
+      // Resale or ordinary updates without explicit syncBuyer should NEVER propagate to other transactions
+      const isResale = updatedData.isResold || targetTrans?.isResold;
+      const shouldSyncBuyer = options?.syncBuyer === true && !isResale;
 
       const specialNames = ['대천AS', '대천폐기', '대천', '대천공장'];
       const origCust = (targetTrans?.customerName || '').trim();
@@ -538,20 +547,23 @@ const App: React.FC = () => {
       const isSpecial = specialNames.includes(origCust);
 
       const isCustomerInfoChanged = !!targetTrans && !isSpecial && (origCust !== '' || origUser !== '') && (
-        (updatedData.customerName !== undefined && updatedData.customerName !== targetTrans.customerName) ||
-        (updatedData.userId !== undefined && updatedData.userId !== targetTrans.userId) ||
-        (updatedData.phoneNumber !== undefined && updatedData.phoneNumber !== targetTrans.phoneNumber) ||
-        (updatedData.address !== undefined && updatedData.address !== targetTrans.address) ||
+        (updatedData.customerName !== undefined && updatedData.customerName.trim() !== (targetTrans.customerName || '').trim()) ||
+        (updatedData.userId !== undefined && (updatedData.userId || '').trim() !== (targetTrans.userId || '').trim()) ||
+        (updatedData.phoneNumber !== undefined && (updatedData.phoneNumber || '').trim() !== (targetTrans.phoneNumber || '').trim()) ||
+        (updatedData.address !== undefined && (updatedData.address || '').trim() !== (targetTrans.address || '').trim()) ||
         (updatedData.priceType !== undefined && updatedData.priceType !== targetTrans.priceType)
       );
 
       const todayStr = new Date().toISOString().split('T')[0];
 
-      if (isCustomerInfoChanged) {
+      if (shouldSyncBuyer && isCustomerInfoChanged) {
         const customerSyncData: Partial<Transaction> = {
           customerUpdatedDate: todayStr,
         };
-        if (updatedData.customerName !== undefined) customerSyncData.customerName = updatedData.customerName;
+        if (updatedData.customerName !== undefined && updatedData.customerName.trim() !== (targetTrans.customerName || '').trim()) {
+          customerSyncData.customerName = updatedData.customerName;
+          customerSyncData.originalCustomerName = targetTrans.customerName;
+        }
         if (updatedData.userId !== undefined) customerSyncData.userId = updatedData.userId;
         if (updatedData.phoneNumber !== undefined) customerSyncData.phoneNumber = updatedData.phoneNumber;
         if (updatedData.address !== undefined) customerSyncData.address = updatedData.address;
@@ -566,10 +578,10 @@ const App: React.FC = () => {
                 : (updatedData.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0));
               return { ...t, ...updatedData, unitPrice: currentUnitPrice, customerUpdatedDate: todayStr };
             }
-            // Same buyer release transactions across all items
+            // Same buyer release transactions (skip returned / resold / special items)
             const tCust = (t.customerName || '').trim();
             const tUser = (t.userId || '').trim();
-            const isSameBuyer = t.type === 'release' && !specialNames.includes(tCust) && (
+            const isSameBuyer = t.type === 'release' && !t.isReturned && !t.isResold && !specialNames.includes(tCust) && (
               (origCust !== '' && tCust === origCust) ||
               (origUser !== '' && tUser === origUser)
             );

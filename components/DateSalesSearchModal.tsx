@@ -380,7 +380,7 @@ export default function DateSalesSearchModal({
                     {transaction.customerName ? (
                       <div className="flex flex-col items-end">
                         {transaction.originalCustomerName && (
-                          <span className="text-[9px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-1">{transaction.originalCustomerName}</span>
+                          <span className="text-[9px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-1" title={`이전 구매자: ${transaction.originalCustomerName}`}>(이전: {transaction.originalCustomerName})</span>
                         )}
                         <button
                           type="button"
@@ -472,7 +472,7 @@ export default function DateSalesSearchModal({
                         <td className="px-6 py-4 font-black text-slate-700 text-xs sm:text-sm">
                           <div className="flex flex-col">
                             {transaction.originalCustomerName && (
-                              <span className="text-[10px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-1">{transaction.originalCustomerName}</span>
+                              <span className="text-[10px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-1" title={`이전 구매자: ${transaction.originalCustomerName}`}>(이전: {transaction.originalCustomerName})</span>
                             )}
                             {transaction.customerName ? (
                               <button

@@ -43,7 +43,14 @@ export default function ResaleModal({
       return;
     }
 
+    const resaleDate = new Date().toISOString();
+    const resaleRemark = `재판매: ${customerTrimmed} (${new Date().toLocaleDateString()})`;
+    const updatedRemarks = transaction.remarks 
+      ? `${transaction.remarks} / ${resaleRemark}` 
+      : resaleRemark;
+
     onConfirm(item.id, transaction.id, {
+      date: resaleDate, // 재판매 일자로 업데이트
       originalSerialNumber: transaction.serialNumber, // 이전 일련번호 보관
       originalCustomerName: transaction.customerName, // 이전 고객명 보관
       serialNumber: serialTrimmed,
@@ -51,8 +58,9 @@ export default function ResaleModal({
       userId: newUserId.trim() || undefined,
       phoneNumber: newPhoneNumber.trim() || undefined,
       address: newAddress.trim() || undefined,
-      isReturned: false, // 반품 보관에서 원위치로 복구
+      isReturned: false, // 반품 보관에서 출고 상태로 복구
       isResold: true, // 재판매 표시
+      remarks: updatedRemarks,
     });
   };
 
