@@ -5,6 +5,7 @@ export interface Transaction {
   quantity: number;
   date: string;
   remarks: string;
+  historyRemarks?: string; // 반품, 원복, 재판매, 폐기 등에 대한 상태 이력 기록
   modelName?: string; // 기종 정보
   serialNumber?: string; // 일련번호 (선택)
   customerName?: string; // 이름

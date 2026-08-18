@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Item, Transaction } from '../types';
 import { CloseIcon, SearchIcon, DownloadIcon } from './icons';
+import { extractRemarksAndHistory } from '../utils/historyUtils';
 
 interface BuyerSearchModalProps {
   items: Item[];
@@ -32,8 +33,10 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           if (cust === '대천' || cust === '대천공장' || cust === '대천AS' || cust === '대천폐기') {
             return;
           }
+          const { userRemarks } = extractRemarksAndHistory(t);
           releases.push({
             ...t,
+            remarks: userRemarks || (t.historyRemarks ? '' : t.remarks),
             itemName: item.name,
             itemBrand: item.category || '-',
             itemCode: item.code || '',

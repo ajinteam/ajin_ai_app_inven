@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Item, Transaction, User } from '../types';
 import { CloseIcon, ArrowUpIcon, ArrowDownIcon, EditIcon, CheckIcon, BoxIcon, TrashIcon, DownloadIcon, PlusIcon, SyncIcon, SearchIcon } from './icons';
+import { extractRemarksAndHistory, appendHistory } from '../utils/historyUtils';
 
 interface ItemDetailModalProps {
   item: Item;
@@ -488,8 +489,17 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const handleEditTransaction = (t: Transaction) => {
     setEditingTransactionId(t.id);
-    setTransEditData({ ...t });
-    setShowTransEditModal(t);
+    const { userRemarks, historyRemarks } = extractRemarksAndHistory(t);
+    setTransEditData({ 
+      ...t, 
+      remarks: userRemarks,
+      historyRemarks: historyRemarks || t.historyRemarks 
+    });
+    setShowTransEditModal({
+      ...t,
+      remarks: userRemarks,
+      historyRemarks: historyRemarks || t.historyRemarks
+    });
   };
 
   const handleSaveTransEdit = (id: string) => {
@@ -519,16 +529,19 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const handleReturnSubmit = () => {
     if (showReturnModal) {
       const reason = returnReason === '기타' ? `기타: ${returnRemarks}` : returnReason;
+      const returnEntry = `반품: ${reason}`;
       
       if (showReturnModal.transactionIds && showReturnModal.transactionIds.length > 0) {
         showReturnModal.transactionIds.forEach(tId => {
           const currentTrans = item.transactions.find(t => t.id === tId);
           if (currentTrans) {
-            const newRemarks = currentTrans.remarks ? `${currentTrans.remarks} / 반품: ${reason}` : `반품: ${reason}`;
+            const { userRemarks, historyRemarks: prevHistory } = extractRemarksAndHistory(currentTrans);
+            const updatedHistoryRemarks = appendHistory(prevHistory, returnEntry);
             onUpdateTransaction(showReturnModal.itemId, tId, {
               isReturned: true,
               returnReason: reason,
-              remarks: newRemarks
+              remarks: userRemarks,
+              historyRemarks: updatedHistoryRemarks
             });
           }
         });
@@ -536,12 +549,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         alert(`${showReturnModal.transactionIds.length}건이 일괄 반품 보관함으로 이동되었습니다.`);
       } else if (showReturnModal.transactionId) {
         const currentTrans = item.transactions.find(t => t.id === showReturnModal.transactionId);
-        const newRemarks = currentTrans?.remarks ? `${currentTrans.remarks} / 반품: ${reason}` : `반품: ${reason}`;
+        const { userRemarks, historyRemarks: prevHistory } = extractRemarksAndHistory(currentTrans);
+        const updatedHistoryRemarks = appendHistory(prevHistory, returnEntry);
         
         onUpdateTransaction(showReturnModal.itemId, showReturnModal.transactionId, {
           isReturned: true,
           returnReason: reason,
-          remarks: newRemarks
+          remarks: userRemarks,
+          historyRemarks: updatedHistoryRemarks
         });
         alert('반품 보관함으로 이동되었습니다.');
       }
@@ -552,7 +567,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const handleRestoreSubmit = () => {
     if (!showRestorePrompt) return;
-    const { itemId, transactionId, originalRemarks } = showRestorePrompt;
+    const { itemId, transactionId } = showRestorePrompt;
 
     let actionLabel = '';
     if (restoreActionText === '수리') {
@@ -568,14 +583,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       return;
     }
 
-    const finalRemarks = originalRemarks 
-      ? `${originalRemarks} / 복원: ${actionLabel}` 
-      : `복원: ${actionLabel}`;
+    const currentTrans = item.transactions.find(t => t.id === transactionId);
+    const { userRemarks, historyRemarks: prevHistory } = extractRemarksAndHistory(currentTrans);
+    const restoreEntry = `복원: ${actionLabel}`;
+    const updatedHistoryRemarks = appendHistory(prevHistory, restoreEntry);
 
     onUpdateTransaction(itemId, transactionId, {
       isReturned: false,
       returnReason: '',
-      remarks: finalRemarks
+      remarks: userRemarks,
+      historyRemarks: updatedHistoryRemarks
     });
 
     setShowRestorePrompt(null);
@@ -1127,25 +1144,33 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                                           </>
                                         )}
                                         <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                          <div className="flex flex-col gap-1 min-w-[160px] max-w-[240px] sm:max-w-[320px]">
-                                            {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest w-fit bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">폐기됨</span>}
-                                            {t.isReturned && <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest w-fit bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">반품 보관중</span>}
-                                            {t.isResold && <span className="text-[8px] font-black text-sky-700 uppercase tracking-widest w-fit bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">재판매 완료</span>}
-                                            
-                                            <p className={`text-[10px] sm:text-xs text-slate-700 font-bold whitespace-pre-wrap break-words leading-relaxed ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
-                                              {t.remarks || '-'}
-                                            </p>
+                                          {(() => {
+                                            const { userRemarks, historyRemarks } = extractRemarksAndHistory(t);
+                                            const hasHistory = !!(t.returnReason || t.isReturned || t.isResold || t.isDiscarded || t.originalSerialNumber || t.originalCustomerName || t.historyRemarks || historyRemarks);
+                                            const displayRemarks = userRemarks || (hasHistory ? '' : (t.remarks || ''));
 
-                                            {(t.returnReason || t.isReturned || t.isResold || t.originalSerialNumber || t.originalCustomerName || (t.remarks && (t.remarks.includes('반품:') || t.remarks.includes('복원:')))) && (
-                                              <button
-                                                type="button"
-                                                onClick={() => setShowReturnDetailModal(t)}
-                                                className="mt-1 inline-flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg w-fit transition-all cursor-pointer shadow-sm hover:shadow"
-                                              >
-                                                <span>📋 반품/이력 상세</span>
-                                              </button>
-                                            )}
-                                          </div>
+                                            return (
+                                              <div className="flex flex-col gap-1 min-w-[160px] max-w-[240px] sm:max-w-[320px]">
+                                                {t.isDiscarded && <span className="text-[8px] font-black text-rose-600 uppercase tracking-widest w-fit bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">폐기됨</span>}
+                                                {t.isReturned && <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest w-fit bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">반품 보관중</span>}
+                                                {t.isResold && <span className="text-[8px] font-black text-sky-700 uppercase tracking-widest w-fit bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">재판매 완료</span>}
+                                                
+                                                <p className={`text-[10px] sm:text-xs text-slate-700 font-bold whitespace-pre-wrap break-words leading-relaxed ${t.isDiscarded ? 'line-through text-rose-300 decoration-rose-500 decoration-2' : ''}`}>
+                                                  {displayRemarks || '-'}
+                                                </p>
+
+                                                {hasHistory && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setShowReturnDetailModal(t)}
+                                                    className="mt-1 inline-flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg w-fit transition-all cursor-pointer shadow-sm hover:shadow"
+                                                  >
+                                                    <span>📋 반품/이력 상세</span>
+                                                  </button>
+                                                )}
+                                              </div>
+                                            );
+                                          })()}
                                         </td>
                                         <td className="px-2 sm:px-4 py-3 sm:py-4 text-center sticky right-0 bg-inherit group-hover:bg-white z-10 border-l-2 border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">
                                           <div className="flex items-center justify-center gap-1 sm:gap-2 transition-opacity">
@@ -1673,19 +1698,57 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 )}
               </div>
 
-              {/* 반품 사유 섹션 */}
-              {showReturnDetailModal.returnReason && (
-                <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200">
-                  <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest block mb-1">🏷️ 등록된 반품 사유</span>
-                  <p className="text-xs font-extrabold text-amber-900 whitespace-pre-wrap">{showReturnDetailModal.returnReason}</p>
-                </div>
-              )}
+              {/* 반품, 원복, 재판매, 폐기 등 상태 처리 이력 & 비고(참고사항) */}
+              {(() => {
+                const { userRemarks, historyList, historyRemarks } = extractRemarksAndHistory(showReturnDetailModal);
+                const hasReturnReason = !!showReturnDetailModal.returnReason;
+                const hasHistory = !!(historyRemarks || historyList.length > 0 || hasReturnReason || showReturnDetailModal.isReturned || showReturnDetailModal.isResold || showReturnDetailModal.isDiscarded);
 
-              {/* 비고 전체 내용 */}
-              <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 space-y-1">
-                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-1">📝 비고 (전체 이력 및 상황)</span>
-                <p className="text-xs font-bold text-slate-800 whitespace-pre-wrap break-all leading-relaxed">{showReturnDetailModal.remarks || '등록된 비고가 없습니다.'}</p>
-              </div>
+                return (
+                  <>
+                    {/* 1. 반품, 원복, 재판매, 폐기 등에 대한 상태 이력 기록 */}
+                    {hasHistory && (
+                      <div className="bg-amber-50/90 p-4 rounded-2xl border border-amber-200/80 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-amber-900 uppercase tracking-widest flex items-center gap-1.5">
+                            <span>⚙️ 반품 / 원복 / 재판매 / 폐기 처리 이력</span>
+                            <span className="text-[8px] bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded">상태 기록</span>
+                          </span>
+                        </div>
+
+                        {historyList.length > 0 ? (
+                          <div className="space-y-1.5 pt-0.5">
+                            {historyList.map((entry, idx) => (
+                              <div key={idx} className="flex items-start gap-2 bg-white/90 p-2.5 rounded-xl border border-amber-200/70 text-xs font-bold text-slate-800 shadow-sm">
+                                <span className="text-amber-600 shrink-0 font-black">#{idx + 1}</span>
+                                <span className="break-all leading-relaxed">{entry}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : hasReturnReason ? (
+                          <div className="bg-white/90 p-2.5 rounded-xl border border-amber-200/70 text-xs font-bold text-slate-800 shadow-sm">
+                            <span className="text-amber-700 font-black">반품 사유:</span> {showReturnDetailModal.returnReason}
+                          </div>
+                        ) : (
+                          <p className="text-xs font-bold text-amber-800">
+                            {historyRemarks || '등록된 상태 처리 이력이 없습니다.'}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 2. 일반 비고 (참고 사항, 메모, 특이사항) */}
+                    <div className="bg-indigo-50/60 p-4 rounded-2xl border border-indigo-100 space-y-1.5">
+                      <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest block">
+                        📝 비고 (참고 사항 / 메모)
+                      </span>
+                      <p className="text-xs font-bold text-slate-800 whitespace-pre-wrap break-all leading-relaxed">
+                        {userRemarks || '등록된 참고사항(비고)이 없습니다.'}
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
 
               <div className="pt-2">
                 <button

@@ -9,6 +9,7 @@ import UserManagementModal from './components/UserManagementModal';
 import DateSalesSearchModal from './components/DateSalesSearchModal';
 import ResaleModal from './components/ResaleModal';
 import { PlusIcon, BoxIcon, SearchIcon, TrashIcon, DownloadIcon, CloudIcon, ServerIcon, SyncIcon, ArrowDownIcon } from './components/icons';
+import { extractRemarksAndHistory, appendHistory } from './utils/historyUtils';
 
 const detectDateInSearch = (text: string): string | null => {
   const clean = text.trim();
@@ -629,6 +630,8 @@ const App: React.FC = () => {
       return;
     }
 
+    const restoreEntry = `복원: ${actionLabel}`;
+
     if (showRestorePrompt.transactionIds && showRestorePrompt.transactionIds.length > 0) {
       setItems(prev => prev.map(item => {
         const itemRestores = showRestorePrompt.transactionIds!.filter(r => r.itemId === item.id);
@@ -638,14 +641,14 @@ const App: React.FC = () => {
             transactions: item.transactions.map(t => {
               const r = itemRestores.find(x => x.transactionId === t.id);
               if (r) {
-                const finalRemarks = r.originalRemarks 
-                  ? `${r.originalRemarks} / 복원: ${actionLabel}` 
-                  : `복원: ${actionLabel}`;
+                const { userRemarks, historyRemarks: prevHistory } = extractRemarksAndHistory(t);
+                const updatedHistoryRemarks = appendHistory(prevHistory, restoreEntry);
                 return {
                   ...t,
                   isReturned: false,
                   returnReason: undefined,
-                  remarks: finalRemarks
+                  remarks: userRemarks,
+                  historyRemarks: updatedHistoryRemarks
                 };
               }
               return t;
@@ -657,15 +660,17 @@ const App: React.FC = () => {
       setSelectedReturnIds([]);
       alert(`${showRestorePrompt.transactionIds.length}건이 일괄 원래 출고 상태로 복원되었습니다.`);
     } else if (showRestorePrompt.itemId && showRestorePrompt.transactionId) {
-      const { itemId, transactionId, originalRemarks } = showRestorePrompt;
-      const finalRemarks = originalRemarks 
-        ? `${originalRemarks} / 복원: ${actionLabel}` 
-        : `복원: ${actionLabel}`;
+      const { itemId, transactionId } = showRestorePrompt;
+      const targetItem = items.find(it => it.id === itemId);
+      const targetTrans = targetItem?.transactions.find(t => t.id === transactionId);
+      const { userRemarks, historyRemarks: prevHistory } = extractRemarksAndHistory(targetTrans);
+      const updatedHistoryRemarks = appendHistory(prevHistory, restoreEntry);
 
       handleUpdateTransaction(itemId, transactionId, {
         isReturned: false,
         returnReason: undefined,
-        remarks: finalRemarks
+        remarks: userRemarks,
+        historyRemarks: updatedHistoryRemarks
       });
       alert('원래 출고 상태로 복원되었습니다.');
     }
@@ -709,6 +714,7 @@ const App: React.FC = () => {
     if (confirm(`선택한 ${selectedReturnIds.length}개 반품 품목을 일괄 폐기하시겠습니까?`)) {
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const discardEntry = `폐기(${dateStr})`;
 
       setItems(prev => prev.map(item => {
         const hasSelected = item.transactions.some(t => selectedReturnIds.includes(t.id));
@@ -717,11 +723,13 @@ const App: React.FC = () => {
             ...item,
             transactions: item.transactions.map(t => {
               if (selectedReturnIds.includes(t.id)) {
-                const newRemarks = t.remarks ? `${t.remarks} / 폐기(${dateStr})` : `폐기(${dateStr})`;
+                const { userRemarks, historyRemarks: prevHistory } = extractRemarksAndHistory(t);
+                const updatedHistoryRemarks = appendHistory(prevHistory, discardEntry);
                 return {
                   ...t,
                   isDiscarded: true,
-                  remarks: newRemarks
+                  remarks: userRemarks,
+                  historyRemarks: updatedHistoryRemarks
                 };
               }
               return t;
@@ -1126,8 +1134,12 @@ const App: React.FC = () => {
                           <span className={transaction.isDiscarded ? 'line-through text-rose-400 decoration-rose-500 decoration-2' : ''}>{transaction.serialNumber}</span>
                         </td>
                         <td className="px-4 sm:px-10 py-4 sm:py-7">
-                          <span className={`px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-wider border border-amber-100 ${transaction.isDiscarded ? 'opacity-50' : ''}`}>{transaction.returnReason}</span>
-                          {transaction.remarks && <p className="text-[10px] text-slate-400 mt-1 font-bold whitespace-pre-wrap break-all">{transaction.remarks}</p>}
+                          <span className={`px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-wider border border-amber-100 ${transaction.isDiscarded ? 'opacity-50' : ''}`}>{transaction.returnReason || '반품'}</span>
+                          {(() => {
+                            const { userRemarks } = extractRemarksAndHistory(transaction);
+                            const note = userRemarks || (transaction.historyRemarks ? '' : transaction.remarks);
+                            return note ? <p className="text-[10px] text-slate-400 mt-1 font-bold whitespace-pre-wrap break-all">{note}</p> : null;
+                          })()}
                         </td>
                         <td className="px-4 sm:px-10 py-4 sm:py-7">
                           <p className={`font-black text-slate-700 text-sm ${transaction.isDiscarded ? 'line-through text-rose-300' : ''}`}>{transaction.customerName || '-'}</p>
@@ -1148,8 +1160,14 @@ const App: React.FC = () => {
                                   onClick={() => {
                                     const now = new Date();
                                     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                                    const newRemarks = transaction.remarks ? `${transaction.remarks} / 폐기(${dateStr})` : `폐기(${dateStr})`;
-                                    handleUpdateTransaction(item.id, transaction.id, { isDiscarded: true, remarks: newRemarks });
+                                    const discardEntry = `폐기(${dateStr})`;
+                                    const { userRemarks, historyRemarks: prevHistory } = extractRemarksAndHistory(transaction);
+                                    const updatedHistoryRemarks = appendHistory(prevHistory, discardEntry);
+                                    handleUpdateTransaction(item.id, transaction.id, { 
+                                      isDiscarded: true, 
+                                      remarks: userRemarks,
+                                      historyRemarks: updatedHistoryRemarks
+                                    });
                                   }}
                                   className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg font-black text-[10px] uppercase border border-rose-100 hover:bg-rose-600 hover:text-white"
                                 >

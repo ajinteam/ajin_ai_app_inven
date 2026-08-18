@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Item, Transaction } from '../types';
 import { CloseIcon } from './icons';
+import { extractRemarksAndHistory, appendHistory } from '../utils/historyUtils';
 
 interface ResaleModalProps {
   item: Item;
@@ -44,10 +45,9 @@ export default function ResaleModal({
     }
 
     const resaleDate = new Date().toISOString();
-    const resaleRemark = `재판매: ${customerTrimmed} (${new Date().toLocaleDateString()})`;
-    const updatedRemarks = transaction.remarks 
-      ? `${transaction.remarks} / ${resaleRemark}` 
-      : resaleRemark;
+    const resaleEntry = `재판매: ${customerTrimmed} (${new Date().toLocaleDateString()})`;
+    const { userRemarks, historyRemarks: prevHistory } = extractRemarksAndHistory(transaction);
+    const updatedHistoryRemarks = appendHistory(prevHistory, resaleEntry);
 
     onConfirm(item.id, transaction.id, {
       date: resaleDate, // 재판매 일자로 업데이트
@@ -60,7 +60,8 @@ export default function ResaleModal({
       address: newAddress.trim() || undefined,
       isReturned: false, // 반품 보관에서 출고 상태로 복구
       isResold: true, // 재판매 표시
-      remarks: updatedRemarks,
+      remarks: userRemarks, // 일반 참고사항/메모는 깨끗하게 보존
+      historyRemarks: updatedHistoryRemarks, // 반품/원복/재판매/폐기 이력은 historyRemarks에 기록
     });
   };
 

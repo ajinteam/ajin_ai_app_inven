@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Item, Transaction } from '../types';
 import { CloseIcon, DownloadIcon } from './icons';
+import { extractRemarksAndHistory } from '../utils/historyUtils';
 
 interface DateSalesSearchModalProps {
   isOpen: boolean;
@@ -68,7 +69,14 @@ export default function DateSalesSearchModal({
           }
           const transDate = getLocalDateString(t.date);
           if (transDate === selectedDate) {
-            list.push({ item, transaction: t });
+            const { userRemarks } = extractRemarksAndHistory(t);
+            list.push({ 
+              item, 
+              transaction: {
+                ...t,
+                remarks: userRemarks || (t.historyRemarks ? '' : t.remarks)
+              } 
+            });
           }
         }
       });
