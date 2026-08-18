@@ -1499,6 +1499,63 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:border-indigo-500 resize-y leading-relaxed"
                     />
                   </div>
+
+                  {/* 마스터 & 5200 관리자 전용: 단가 구분 (일반 / 대리점) 일괄 수정 */}
+                  {showPrice && (
+                    <div className="bg-amber-50/80 p-3 rounded-xl border border-amber-200/80">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                          <span>🏷️ 단가 구분</span>
+                          <span className="text-[8px] bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded">관리자 전용</span>
+                        </label>
+                        <span className="text-[9px] font-bold text-amber-700">
+                          ※ 변경 시 동일 구매자의 모든 구매내역 일괄 적용
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTransEditData(prev => ({
+                              ...prev,
+                              priceType: 'general',
+                              unitPrice: item.unitPrice || 0
+                            }));
+                          }}
+                          className={`py-2 px-3 rounded-lg font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            (transEditData.priceType || 'general') === 'general'
+                              ? 'bg-amber-600 text-white shadow-sm'
+                              : 'bg-white text-slate-600 border border-amber-200 hover:bg-amber-100/60'
+                          }`}
+                        >
+                          <span>일반</span>
+                          {item.unitPrice !== undefined && (
+                            <span className="text-[10px] opacity-85">({item.unitPrice.toLocaleString()}원)</span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTransEditData(prev => ({
+                              ...prev,
+                              priceType: 'agency',
+                              unitPrice: item.agencyPrice || item.unitPrice || 0
+                            }));
+                          }}
+                          className={`py-2 px-3 rounded-lg font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            transEditData.priceType === 'agency'
+                              ? 'bg-amber-600 text-white shadow-sm'
+                              : 'bg-white text-slate-600 border border-amber-200 hover:bg-amber-100/60'
+                          }`}
+                        >
+                          <span>대리점</span>
+                          {item.agencyPrice !== undefined && (
+                            <span className="text-[10px] opacity-85">({item.agencyPrice.toLocaleString()}원)</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -541,7 +541,8 @@ const App: React.FC = () => {
         (updatedData.customerName !== undefined && updatedData.customerName !== targetTrans.customerName) ||
         (updatedData.userId !== undefined && updatedData.userId !== targetTrans.userId) ||
         (updatedData.phoneNumber !== undefined && updatedData.phoneNumber !== targetTrans.phoneNumber) ||
-        (updatedData.address !== undefined && updatedData.address !== targetTrans.address)
+        (updatedData.address !== undefined && updatedData.address !== targetTrans.address) ||
+        (updatedData.priceType !== undefined && updatedData.priceType !== targetTrans.priceType)
       );
 
       const todayStr = new Date().toISOString().split('T')[0];
@@ -554,12 +555,16 @@ const App: React.FC = () => {
         if (updatedData.userId !== undefined) customerSyncData.userId = updatedData.userId;
         if (updatedData.phoneNumber !== undefined) customerSyncData.phoneNumber = updatedData.phoneNumber;
         if (updatedData.address !== undefined) customerSyncData.address = updatedData.address;
+        if (updatedData.priceType !== undefined) customerSyncData.priceType = updatedData.priceType;
 
         return prev.map(item => ({
           ...item,
           transactions: item.transactions.map(t => {
             if (t.id === transactionId && item.id === itemId) {
-              return { ...t, ...updatedData, customerUpdatedDate: todayStr };
+              const currentUnitPrice = updatedData.unitPrice !== undefined 
+                ? updatedData.unitPrice 
+                : (updatedData.priceType === 'agency' ? (item.agencyPrice || item.unitPrice || 0) : (item.unitPrice || 0));
+              return { ...t, ...updatedData, unitPrice: currentUnitPrice, customerUpdatedDate: todayStr };
             }
             // Same buyer release transactions across all items
             const tCust = (t.customerName || '').trim();
@@ -569,7 +574,14 @@ const App: React.FC = () => {
               (origUser !== '' && tUser === origUser)
             );
             if (isSameBuyer) {
-              return { ...t, ...customerSyncData };
+              const updatedBuyerTrans: Partial<Transaction> = { ...customerSyncData };
+              if (updatedData.priceType !== undefined) {
+                updatedBuyerTrans.priceType = updatedData.priceType;
+                updatedBuyerTrans.unitPrice = updatedData.priceType === 'agency' 
+                  ? (item.agencyPrice || item.unitPrice || 0) 
+                  : (item.unitPrice || 0);
+              }
+              return { ...t, ...updatedBuyerTrans };
             }
             return t;
           })
