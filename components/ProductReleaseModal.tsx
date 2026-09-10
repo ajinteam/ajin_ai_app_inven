@@ -291,27 +291,27 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:col-span-2">
                 <label className="sm:w-24 text-xs font-black text-indigo-650 uppercase">출고 일자 *</label>
-                <input type="date" value={releaseDate} onChange={e => setReleaseDate(e.target.value)} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" required />
+                <input type="date" value={releaseDate} onChange={e => setReleaseDate(e.target.value)} dir="ltr" className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-left text-start" required />
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">대상자 *</label>
-                <input value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" placeholder="대상자 이름" />
+                <input value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} dir="ltr" className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" placeholder="대상자 이름" />
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">아이디</label>
-                <input value={customerInfo.userId} onChange={e => setCustomerInfo({...customerInfo, userId: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400" placeholder="아이디" />
+                <input value={customerInfo.userId} onChange={e => setCustomerInfo({...customerInfo, userId: e.target.value})} dir="ltr" className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" placeholder="아이디" />
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:col-span-2">
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">연락처</label>
-                <input value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                <input value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} dir="ltr" className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" />
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:col-span-2">
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">주소</label>
-                <input value={customerInfo.address} onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                <input value={customerInfo.address} onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})} dir="ltr" className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" />
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:col-span-2">
                 <label className="sm:w-24 text-xs font-black text-slate-400 uppercase">비고</label>
-                <input value={customerInfo.remarks} onChange={e => setCustomerInfo({...customerInfo, remarks: e.target.value})} className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                <input value={customerInfo.remarks} onChange={e => setCustomerInfo({...customerInfo, remarks: e.target.value})} dir="ltr" className="flex-grow px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" />
               </div>
             </div>
           </div>
@@ -374,18 +374,18 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
                   <label className="w-24 text-xs font-black text-slate-400 uppercase">수량</label>
-                  <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="1" className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400" />
+                  <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="1" dir="ltr" className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400 text-left text-start" />
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="w-24 text-xs font-black text-slate-400 uppercase">일련번호</label>
-                  <input value={serial} onChange={e => setSerial(e.target.value.toUpperCase())} className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-mono font-black text-indigo-600 outline-none focus:border-indigo-400" />
+                  <input value={serial} onChange={e => setSerial(e.target.value.toUpperCase())} dir="ltr" className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-mono font-black text-indigo-600 outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" />
                 </div>
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <label className="w-24 text-xs font-black text-slate-400 uppercase">비고</label>
                 <div className="flex gap-2 w-full">
-                  <input value={itemRemarks} onChange={e => setItemRemarks(e.target.value)} className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400" />
+                  <input value={itemRemarks} onChange={e => setItemRemarks(e.target.value)} dir="ltr" className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" />
                   <button onClick={handleAddToList} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-indigo-700 transition-all flex items-center gap-2">
                     <PlusIcon className="w-4 h-4" />추가
                   </button>
