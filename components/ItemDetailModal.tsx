@@ -1418,28 +1418,53 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       <option value={item.id}>
                         [현재 제품] [{item.code || '코드없음'}] {item.name} {item.category ? `(${item.category})` : ''}
                       </option>
-                      {allItems && allItems.length > 0 && (
-                        <>
-                          <optgroup label="─── 완제품 (Products) ───">
-                            {allItems
-                              .filter(i => i.type === 'product' && i.id !== item.id)
-                              .map(p => (
-                                <option key={p.id} value={p.id}>
-                                  [{p.code || '코드없음'}] {p.name} {p.category ? `(${p.category})` : ''}
-                                </option>
-                              ))}
-                          </optgroup>
-                          <optgroup label="─── 부품 (Parts) ───">
-                            {allItems
-                              .filter(i => i.type === 'part' && i.id !== item.id)
-                              .map(p => (
-                                <option key={p.id} value={p.id}>
-                                  [{p.code || '코드없음'}] {p.name}
-                                </option>
-                              ))}
-                          </optgroup>
-                        </>
-                      )}
+                      {allItems && allItems.length > 0 && (() => {
+                        const gilProducts = allItems.filter(i => i.type === 'product' && i.id !== item.id && (i.category === 'GiL' || i.category === 'GIL' || (!i.category && !i.name.includes('KATO') && !i.name.includes('TOMIX'))));
+                        const katoProducts = allItems.filter(i => i.type === 'product' && i.id !== item.id && (i.category === 'KATO' || i.category?.toLowerCase() === 'kato'));
+                        const tomixProducts = allItems.filter(i => i.type === 'product' && i.id !== item.id && (i.category === 'TOMIX' || i.category?.toLowerCase() === 'tomix'));
+                        const otherProducts = allItems.filter(i => i.type === 'product' && i.id !== item.id && !gilProducts.some(g => g.id === i.id) && !katoProducts.some(k => k.id === i.id) && !tomixProducts.some(t => t.id === i.id));
+
+                        return (
+                          <>
+                            {gilProducts.length > 0 && (
+                              <optgroup label="─── [GiL] 완제품 ───">
+                                {gilProducts.map(p => (
+                                  <option key={p.id} value={p.id}>
+                                    [{p.code || '코드없음'}] {p.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {katoProducts.length > 0 && (
+                              <optgroup label="─── [KATO] 완제품 ───">
+                                {katoProducts.map(p => (
+                                  <option key={p.id} value={p.id}>
+                                    [{p.code || '코드없음'}] {p.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {tomixProducts.length > 0 && (
+                              <optgroup label="─── [TOMIX] 완제품 ───">
+                                {tomixProducts.map(p => (
+                                  <option key={p.id} value={p.id}>
+                                    [{p.code || '코드없음'}] {p.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {otherProducts.length > 0 && (
+                              <optgroup label="─── [기타] 완제품 ───">
+                                {otherProducts.map(p => (
+                                  <option key={p.id} value={p.id}>
+                                    [{p.code || '코드없음'}] {p.name} {p.category ? `(${p.category})` : ''}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </>
+                        );
+                      })()}
                     </select>
                   </div>
 
