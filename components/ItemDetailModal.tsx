@@ -6,6 +6,7 @@ import { extractRemarksAndHistory, appendHistory } from '../utils/historyUtils';
 
 interface ItemDetailModalProps {
   item: Item;
+  allItems?: Item[];
   authRole: 'admin' | 'product_only' | 'custom' | null;
   currentUser?: User | null;
   allUsedSerials: string[];
@@ -13,6 +14,7 @@ interface ItemDetailModalProps {
   onAddTransaction: (itemId: string, transaction: Omit<Transaction, 'id'>) => void;
   onAddTransactions?: (itemId: string, transactions: Omit<Transaction, 'id'>[]) => void;
   onUpdateTransaction: (itemId: string, transactionId: string, updatedData: Partial<Transaction>, options?: { syncBuyer?: boolean }) => void;
+  onMoveTransaction?: (sourceItemId: string, targetItemId: string, transactionId: string, updatedData: Partial<Transaction>) => void;
   onDeleteTransaction: (itemId: string, transactionId: string) => void;
   onUpdateItem: (itemId: string, updatedData: Partial<Item>) => void;
   onClose: () => void;
@@ -90,7 +92,7 @@ const toLocalDatetimeString = (dateStr: string | number | undefined): string => 
 };
 
 const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ 
-  item, authRole, currentUser, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
+  item, allItems, authRole, currentUser, allUsedSerials, existingCodes, onAddTransaction, onAddTransactions, onUpdateTransaction, onMoveTransaction, onDeleteTransaction, onUpdateItem, onClose, showPrice = false
 }) => {
   const [transactionType, setTransactionType] = useState<'purchase' | 'release'>('purchase');
   const [quantity, setQuantity] = useState('');
@@ -104,6 +106,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [transEditData, setTransEditData] = useState<Partial<Transaction>>({});
+  const [editTargetItemId, setEditTargetItemId] = useState<string>(item.id);
   const [showPasswordInput, setShowPasswordInput] = useState<{ type: 'item' | 'trans_save' | 'trans_delete' | 'batch_delete'; targetId?: string; } | null>(null);
   const [password, setPassword] = useState('');
   const [editFormData, setEditFormData] = useState<Partial<Item>>({});
@@ -433,7 +436,14 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         address: isDaecheonSpec ? '' : transEditData.address,
         phoneNumber: isDaecheonSpec ? '' : transEditData.phoneNumber
       };
-      onUpdateTransaction(item.id, currentAction.targetId, updatedTransEditData, { syncBuyer: true });
+
+      if (editTargetItemId && editTargetItemId !== item.id && onMoveTransaction) {
+        onMoveTransaction(item.id, editTargetItemId, currentAction.targetId, updatedTransEditData);
+        const targetItem = allItems?.find(i => i.id === editTargetItemId);
+        alert(`[${item.name}]에서 [${targetItem?.name || '선택한 제품'}] (으)로 내역이 성공적으로 이동되었습니다.\n수량 및 재고가 자동 재계산되었습니다.`);
+      } else {
+        onUpdateTransaction(item.id, currentAction.targetId, updatedTransEditData, { syncBuyer: true });
+      }
       setEditingTransactionId(null);
       setShowTransEditModal(null);
     }
@@ -489,6 +499,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const handleEditTransaction = (t: Transaction) => {
     setEditingTransactionId(t.id);
+    setEditTargetItemId(item.id);
     const { userRemarks, historyRemarks } = extractRemarksAndHistory(t);
     setTransEditData({ 
       ...t, 
@@ -1373,6 +1384,90 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
             {/* Form Body */}
             <div className="overflow-y-auto py-4 space-y-4 pr-1">
+              {/* 소속 제품 (다른 제품으로 이동/변경) */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                editTargetItemId !== item.id
+                  ? 'bg-amber-50/90 border-amber-300 ring-2 ring-amber-400/20 shadow-sm'
+                  : 'bg-slate-50 border-slate-200/70'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                  <label className="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+                    <span>📦 소속 제품 (품목 변경 / 다른 제품으로 이동)</span>
+                    {editTargetItemId !== item.id && (
+                      <span className="text-[9px] bg-amber-500 text-white font-black px-2 py-0.5 rounded-md animate-pulse">
+                        제품 이동 선택됨
+                      </span>
+                    )}
+                  </label>
+                  <span className="text-[9px] text-slate-400 font-bold">
+                    ※ 착각하여 잘못 입력한 경우 이동할 진짜 제품을 선택하세요
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <div className="relative flex-grow w-full">
+                    <select
+                      value={editTargetItemId}
+                      onChange={(e) => setEditTargetItemId(e.target.value)}
+                      className={`w-full px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm outline-none transition-all cursor-pointer border ${
+                        editTargetItemId !== item.id 
+                          ? 'bg-white border-amber-400 text-amber-900 font-black ring-1 ring-amber-300' 
+                          : 'bg-white border-slate-200 text-slate-800 focus:border-indigo-500'
+                      }`}
+                    >
+                      <option value={item.id}>
+                        [현재 제품] [{item.code || '코드없음'}] {item.name} {item.category ? `(${item.category})` : ''}
+                      </option>
+                      {allItems && allItems.length > 0 && (
+                        <>
+                          <optgroup label="─── 완제품 (Products) ───">
+                            {allItems
+                              .filter(i => i.type === 'product' && i.id !== item.id)
+                              .map(p => (
+                                <option key={p.id} value={p.id}>
+                                  [{p.code || '코드없음'}] {p.name} {p.category ? `(${p.category})` : ''}
+                                </option>
+                              ))}
+                          </optgroup>
+                          <optgroup label="─── 부품 (Parts) ───">
+                            {allItems
+                              .filter(i => i.type === 'part' && i.id !== item.id)
+                              .map(p => (
+                                <option key={p.id} value={p.id}>
+                                  [{p.code || '코드없음'}] {p.name}
+                                </option>
+                              ))}
+                          </optgroup>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  {editTargetItemId !== item.id && (
+                    <button
+                      type="button"
+                      onClick={() => setEditTargetItemId(item.id)}
+                      className="shrink-0 px-3 py-2 text-xs font-bold text-slate-600 bg-slate-200/80 hover:bg-slate-300 rounded-xl transition-all cursor-pointer"
+                    >
+                      원래 제품으로 되돌리기
+                    </button>
+                  )}
+                </div>
+
+                {editTargetItemId !== item.id && (
+                  <div className="mt-2.5 p-2.5 bg-amber-100/80 border border-amber-300/90 rounded-xl text-xs text-amber-950 flex items-start gap-2 animate-fade-in-up">
+                    <span className="shrink-0 text-base leading-none">⚠️</span>
+                    <div className="leading-relaxed font-bold">
+                      <span>저장 시 이 수불 내역(구매자 정보, 일련번호, 비고 등)이 </span>
+                      <span className="text-amber-950 underline underline-offset-2 font-black">
+                        [{allItems?.find(i => i.id === editTargetItemId)?.code || '코드'}] {allItems?.find(i => i.id === editTargetItemId)?.name || '선택 제품'}
+                      </span>
+                      <span> (으)로 이전되며, 현재 제품과 이동 대상 제품의 수량 및 재고가 자동 재계산됩니다.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* 구분 & 수량 & 일시 */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60">
                 <div>
@@ -1624,9 +1719,13 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     handleSaveTransEdit(showTransEditModal.id);
                   }
                 }}
-                className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md shadow-indigo-100 cursor-pointer"
+                className={`flex-1 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md cursor-pointer ${
+                  editTargetItemId !== item.id
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100'
+                }`}
               >
-                수정 내용 저장
+                {editTargetItemId !== item.id ? '선택한 제품으로 이동 및 저장' : '수정 내용 저장'}
               </button>
             </div>
           </div>

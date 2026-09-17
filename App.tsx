@@ -613,6 +613,49 @@ const App: React.FC = () => {
     });
   };
 
+  const handleMoveTransaction = (
+    sourceItemId: string,
+    targetItemId: string,
+    transactionId: string,
+    updatedData: Partial<Transaction>
+  ) => {
+    setItems(prev => {
+      const sourceItem = prev.find(i => i.id === sourceItemId);
+      const targetItem = prev.find(i => i.id === targetItemId);
+      if (!sourceItem || !targetItem) return prev;
+
+      const currentTrans = sourceItem.transactions.find(t => t.id === transactionId);
+      if (!currentTrans) return prev;
+
+      const priceType = updatedData.priceType !== undefined ? updatedData.priceType : currentTrans.priceType;
+      const targetUnitPrice = updatedData.unitPrice !== undefined 
+        ? updatedData.unitPrice
+        : (priceType === 'agency' ? (targetItem.agencyPrice || targetItem.unitPrice || 0) : (targetItem.unitPrice || 0));
+
+      const movedTransaction: Transaction = {
+        ...currentTrans,
+        ...updatedData,
+        unitPrice: targetUnitPrice
+      };
+
+      return prev.map(item => {
+        if (item.id === sourceItemId) {
+          return {
+            ...item,
+            transactions: item.transactions.filter(t => t.id !== transactionId)
+          };
+        }
+        if (item.id === targetItemId) {
+          return {
+            ...item,
+            transactions: [movedTransaction, ...item.transactions]
+          };
+        }
+        return item;
+      });
+    });
+  };
+
   const handleRestoreSubmit = () => {
     if (!showRestorePrompt) return;
 
@@ -1405,6 +1448,7 @@ const App: React.FC = () => {
       {selectedItemId && selectedItem && (
         <ItemDetailModal 
           item={selectedItem} 
+          allItems={items}
           authRole={authRole as any} 
           currentUser={currentUser}
           allUsedSerials={allUsedSerials} 
@@ -1412,6 +1456,7 @@ const App: React.FC = () => {
           onAddTransaction={handleAddTransaction} 
           onAddTransactions={handleBatchAddTransactions}
           onUpdateTransaction={handleUpdateTransaction} 
+          onMoveTransaction={handleMoveTransaction}
           onDeleteTransaction={handleDeleteTransaction} 
           onUpdateItem={handleUpdateItem} 
           onClose={() => setSelectedItemId(null)} 
