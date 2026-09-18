@@ -425,7 +425,15 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       (authRole === 'product_only' && password === PRODUCT_ONLY_PASSWORD);
     if (!isPassValid) { alert('비밀번호 오류.'); return; }
     const currentAction = showPasswordInput; setPassword(''); setShowPasswordInput(null);
-    if (currentAction?.type === 'item') onUpdateItem(item.id, editFormData), setIsEditing(false);
+    if (currentAction?.type === 'item') {
+      const finalFormData = {
+        ...editFormData,
+        name: editFormData.name ? editFormData.name.trim() : '',
+        code: editFormData.code ? editFormData.code.trim().toUpperCase() : ''
+      };
+      onUpdateItem(item.id, finalFormData);
+      setIsEditing(false);
+    }
     else if (currentAction?.type === 'trans_save' && currentAction.targetId) {
       const isDaecheonSpec = transEditData.type === 'release' && (transEditData.customerName?.trim() === '대천AS' || transEditData.customerName?.trim() === '대천폐기');
       const updatedTransEditData = {
@@ -493,7 +501,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     const { name, value } = e.target;
     const processedValue = (name === 'quantity') ? (parseInt(value, 10) || 0) : 
                            (name === 'date') ? (value ? new Date(value).toISOString() : new Date().toISOString()) :
-                           (['code', 'name', 'serialNumber'].includes(name) ? value.toUpperCase() : value);
+                           value;
     setTransEditData(prev => ({ ...prev, [name]: processedValue }));
   };
 
@@ -719,7 +727,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               {isEditing ? (
                 <div className="space-y-4 sm:space-y-6">
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">품명</label>
-                    <input name="name" value={editFormData.name || ''} onChange={(e) => setEditFormData({...editFormData, name: e.target.value.toUpperCase()})} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" /></div>
+                    <input name="name" value={editFormData.name || ''} onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} className="w-full px-4 py-2 sm:py-3 border-2 border-indigo-100 bg-white rounded-xl text-base sm:text-lg font-black outline-none" /></div>
                     {item.type === 'product' && (
                       <div>
                         <label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">카테고리</label>
@@ -735,7 +743,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </div>
                     )}
                     <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">코드</label>
-                    <input name="code" value={editFormData.code || ''} onChange={(e) => setEditFormData({...editFormData, code: e.target.value.toUpperCase()})} className={`w-full px-4 py-2 sm:py-3 border-2 rounded-xl text-base sm:text-lg font-mono font-black outline-none ${isCodeDuplicate ? 'border-rose-400 bg-rose-50' : 'border-indigo-100'}`} /></div>
+                    <input name="code" value={editFormData.code || ''} onChange={(e) => setEditFormData({...editFormData, code: e.target.value})} className={`w-full px-4 py-2 sm:py-3 border-2 rounded-xl text-base sm:text-lg font-mono font-black outline-none ${isCodeDuplicate ? 'border-rose-400 bg-rose-50' : 'border-indigo-100'}`} /></div>
                     {item.type === 'part' && (
                       <>
                         <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1 tracking-widest">도번</label>
