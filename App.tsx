@@ -1487,6 +1487,7 @@ const App: React.FC = () => {
           items={items.filter(i => i.type === 'product')} 
           onClose={() => setShowBuyerSearchModal(false)} 
           showPrice={showPrice}
+          authRole={authRole}
         />
       )}
       {showUserManagementModal && (

@@ -7,9 +7,10 @@ interface BuyerSearchModalProps {
   items: Item[];
   onClose: () => void;
   showPrice?: boolean;
+  authRole?: 'admin' | 'product_only' | 'custom' | null;
 }
 
-const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, showPrice = false }) => {
+const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, showPrice = false, authRole = null }) => {
   const [nameInput, setNameInput] = useState('');
   const [nameTerm, setNameTerm] = useState('');
   const [dateTerm, setDateTerm] = useState('');
@@ -36,6 +37,13 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     setSelectedGroupDate('');
     setSelectedGroupCode('');
   }, [viewMode]);
+
+  // If user is not admin and was on ranking view, revert to flat view
+  useEffect(() => {
+    if (authRole !== 'admin' && viewMode === 'ranking') {
+      setViewMode('flat');
+    }
+  }, [authRole, viewMode]);
 
   // Extract all release transactions from all products
   const allReleases = useMemo(() => {
@@ -94,27 +102,34 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }
   }, [availableYears, availableMonths, selectedRankingYear, selectedRankingMonth]);
 
-  // Filter based on user input (Point 2, 3, 4: Strict current buyer, ID, Phone search)
+  // Filter based on user input (Type-Aware Strict Match: Customer Name / ID / Phone / Serial)
   const filteredReleases = useMemo(() => {
     const nameMatch = nameTerm.toLowerCase().trim();
     const dateMatch = dateTerm.trim(); // YYYY-MM-DD or YYYY or YYYY-MM
+
+    const isSerialQuery = /^AJ[PD]\d+/i.test(nameMatch);
     const queryDigits = nameMatch.replace(/\D/g, '');
+    const isPhoneQuery = /^\d{4,11}$/.test(nameMatch) || (queryDigits.length >= 4 && /^010/i.test(nameMatch));
 
     return allReleases.filter(r => {
       let matchesName = true;
       if (nameMatch !== '') {
-        const cust = (r.customerName || '').toLowerCase().trim();
-        const uid = (r.userId || '').toLowerCase().trim();
-        const phoneDigits = (r.phoneNumber || '').replace(/\D/g, '');
-        const serial = (r.serialNumber || '').toLowerCase().trim();
-
-        const matchCust = cust.includes(nameMatch);
-        const matchUid = uid.includes(nameMatch);
-        const matchPhone = queryDigits.length >= 4 ? phoneDigits.includes(queryDigits) : (r.phoneNumber?.toLowerCase().includes(nameMatch) || false);
-        const matchSerial = serial.includes(nameMatch);
-
-        // Match only current customer name, userId, phone number or serial number
-        matchesName = matchCust || matchUid || matchPhone || matchSerial;
+        if (isSerialQuery) {
+          // Serial number query (e.g. AJP03090, AJD00678)
+          const serial = (r.serialNumber || '').toLowerCase().trim();
+          matchesName = serial.includes(nameMatch);
+        } else if (isPhoneQuery) {
+          // Phone digits query (e.g. 5200, 2702, 010-...)
+          const phoneDigits = (r.phoneNumber || '').replace(/\D/g, '');
+          matchesName = phoneDigits.includes(queryDigits);
+        } else {
+          // Customer name or ID query (e.g. '박지성', '김준식', 'MULTY_AX')
+          // STRICT MATCH: ONLY matches current customerName or userId!
+          // NEVER matches remarks, address, originalCustomerName, or other buyers!
+          const cust = (r.customerName || '').toLowerCase().trim();
+          const uid = (r.userId || '').toLowerCase().trim();
+          matchesName = cust.includes(nameMatch) || uid.includes(nameMatch);
+        }
       }
       
       let matchesDate = true;
@@ -136,15 +151,22 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     const query = (nameInput || nameTerm).trim().toLowerCase();
     if (!query) return null;
 
+    const isSerialQuery = /^AJ[PD]\d+/i.test(query);
     const queryDigits = query.replace(/\D/g, '');
+    const isPhoneQuery = /^\d{4,11}$/.test(query) || (queryDigits.length >= 4 && /^010/i.test(query));
 
     // Strict matching with current buyer only
     const matching = allReleases.filter(r => {
-      const cust = (r.customerName || '').toLowerCase().trim();
-      const uid = (r.userId || '').toLowerCase().trim();
-      const phoneDigits = (r.phoneNumber || '').replace(/\D/g, '');
-
-      return cust.includes(query) || uid.includes(query) || (queryDigits.length >= 4 && phoneDigits.includes(queryDigits));
+      if (isSerialQuery) {
+        return (r.serialNumber || '').toLowerCase().trim().includes(query);
+      } else if (isPhoneQuery) {
+        const phoneDigits = (r.phoneNumber || '').replace(/\D/g, '');
+        return phoneDigits.includes(queryDigits);
+      } else {
+        const cust = (r.customerName || '').toLowerCase().trim();
+        const uid = (r.userId || '').toLowerCase().trim();
+        return cust.includes(query) || uid.includes(query);
+      }
     });
 
     if (matching.length === 0) return null;
@@ -170,9 +192,9 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     };
   }, [nameInput, nameTerm, allReleases]);
 
-  // Point 5: Unified Buyer Rankings by Customer Name with accurate period filter
+  // Unified Buyer Rankings by Customer Name with accurate period filter
   const buyerRankings = useMemo(() => {
-    if (viewMode !== 'ranking') return [];
+    if (viewMode !== 'ranking' || authRole !== 'admin') return [];
 
     const periodFiltered = allReleases.filter(r => {
       if (rankingPeriod === 'all') return true;
@@ -256,7 +278,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }
 
     return list;
-  }, [viewMode, allReleases, rankingPeriod, selectedRankingYear, selectedRankingMonth, rankingCriteria]);
+  }, [viewMode, authRole, allReleases, rankingPeriod, selectedRankingYear, selectedRankingMonth, rankingCriteria]);
 
   const totalSalesAmount = useMemo(() => {
     return filteredReleases.reduce((sum, r) => {
@@ -311,7 +333,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [viewMode, filteredReleases]);
 
-  // Point 5: Helper to navigate from ranking to flat list with exact period and name synced
+  // Helper to navigate from ranking to flat list with exact period and name synced
   const handleViewBuyerDetailsFromRanking = (buyerName: string) => {
     setNameInput(buyerName);
     setNameTerm(buyerName);
@@ -385,6 +407,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] animate-fade-in-up flex flex-col h-full max-h-[92vh] overflow-y-auto lg:overflow-hidden">
+        {/* Modal Header: Preserved User Modified Titles */}
         <div className="p-6 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
           <div>
             <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
@@ -433,7 +456,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 {dateTerm && (
                   <button
                     onClick={() => setDateTerm('')}
-                    className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-black hover:bg-slate-200 transition-colors shrink-0"
+                    className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-black hover:bg-slate-200 transition-colors shrink-0 cursor-pointer"
                   >
                     날짜 해제
                   </button>
@@ -477,13 +500,16 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 >
                   코드별 그룹화
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('ranking')}
-                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${viewMode === 'ranking' ? 'bg-indigo-600 text-white shadow-sm' : 'text-amber-600 hover:text-amber-700'}`}
-                >
-                  <span>🏆 구매자 순위</span>
-                </button>
+                {/* Master Admin Only: Ranking View */}
+                {authRole === 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ranking')}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${viewMode === 'ranking' ? 'bg-indigo-600 text-white shadow-sm' : 'text-amber-600 hover:text-amber-700'}`}
+                  >
+                    <span>🏆 구매자 순위</span>
+                  </button>
+                )}
               </div>
               <button 
                 onClick={handleExport}
@@ -557,8 +583,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             </div>
           )}
 
-          {/* BLUE BOX B: Ranking Control Bar */}
-          {viewMode === 'ranking' && (
+          {/* BLUE BOX B: Ranking Control Bar (Master Admin Only) */}
+          {viewMode === 'ranking' && authRole === 'admin' && (
             <div className="pt-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 animate-fade-in bg-gradient-to-r from-amber-50/80 to-indigo-50/80 p-4 sm:p-5 rounded-2xl border-2 border-amber-200 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -720,7 +746,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
         <div className="flex-grow lg:overflow-hidden bg-slate-50/50">
           <div className="p-5 sm:p-7 scrollbar-hide lg:h-full lg:overflow-y-auto">
-            {viewMode === 'ranking' ? (
+            {viewMode === 'ranking' && authRole === 'admin' ? (
               buyerRankings.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full py-20 opacity-30">
                   <span className="text-6xl mb-4">🏆</span>
