@@ -317,10 +317,26 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       let serialMatch = false;
       if (isOnlyDigits) {
         const serialNum = parseInt(serialDigits, 10);
+        const origSerialNum = parseInt(origSerialDigits, 10);
         const termNum = parseInt(termDigits, 10);
         serialMatch = serialDigits.includes(termDigits) || 
                       origSerialDigits.includes(termDigits) ||
-                      (!isNaN(serialNum) && !isNaN(termNum) && serialNum === termNum);
+                      (!isNaN(serialNum) && !isNaN(termNum) && serialNum === termNum) ||
+                      (!isNaN(origSerialNum) && !isNaN(termNum) && origSerialNum === termNum);
+        
+        // Support range serial number matching (e.g. AJP00001~AJP00005)
+        if (!serialMatch && serial.includes('~')) {
+          const rangeParts = serial.split('~');
+          if (rangeParts.length === 2) {
+            const startDigits = rangeParts[0].replace(/\D/g, '');
+            const endDigits = rangeParts[1].replace(/\D/g, '');
+            const startNum = parseInt(startDigits, 10);
+            const endNum = parseInt(endDigits, 10);
+            if (!isNaN(startNum) && !isNaN(endNum) && !isNaN(termNum)) {
+              serialMatch = termNum >= startNum && termNum <= endNum;
+            }
+          }
+        }
       } else {
         serialMatch = serial.includes(term) || origSerial.includes(term);
       }
@@ -1024,10 +1040,27 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <div className="relative w-full sm:w-64">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3"><SearchIcon className="text-slate-400 w-4 h-4" /></span>
                     <input
-                        type="text" value={historySearchTerm} onChange={(e) => setHistorySearchTerm(e.target.value)}
-                        placeholder="번호, 대상자, 아이디 검색..."
-                        className="w-full pl-9 pr-4 py-2 border-2 border-slate-100 rounded-lg sm:rounded-xl focus:outline-none focus:border-indigo-300 bg-white text-xs sm:text-sm font-bold"
+                        type="text" 
+                        value={historySearchTerm} 
+                        onChange={(e) => setHistorySearchTerm(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setHistorySearchTerm('');
+                          }
+                        }}
+                        placeholder="일련번호, 전화번호, 구매자 검색..."
+                        className="w-full pl-9 pr-8 py-2 border-2 border-slate-100 rounded-lg sm:rounded-xl focus:outline-none focus:border-indigo-300 bg-white text-xs sm:text-sm font-bold"
                     />
+                    {historySearchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setHistorySearchTerm('')}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer"
+                        title="검색어 지우기"
+                      >
+                        ✕
+                      </button>
+                    )}
                 </div>
               </div>
               <button onClick={exportHistoryToExcel} className="hidden sm:flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-xl text-xs font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-sm">

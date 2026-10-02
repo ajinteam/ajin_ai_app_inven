@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useDeferredValue, useRef } from 'react';
 import type { Item, Transaction } from '../types';
 import { CloseIcon, SearchIcon, DownloadIcon } from './icons';
 import { extractRemarksAndHistory } from '../utils/historyUtils';
@@ -12,25 +12,20 @@ interface BuyerSearchModalProps {
 
 const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, showPrice = false, authRole = null }) => {
   const [nameInput, setNameInput] = useState('');
-  const [nameTerm, setNameTerm] = useState('');
   const [dateTerm, setDateTerm] = useState('');
   const [viewMode, setViewMode] = useState<'flat' | 'grouped' | 'byCode' | 'ranking'>('flat');
   const [selectedGroupDate, setSelectedGroupDate] = useState('');
   const [selectedGroupCode, setSelectedGroupCode] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Use deferred value for smooth 0ms instant typing and backspacing without freezing
+  const deferredNameInput = useDeferredValue(nameInput);
 
   // Ranking filters
   const [rankingPeriod, setRankingPeriod] = useState<'all' | 'year' | 'month'>('all');
   const [selectedRankingYear, setSelectedRankingYear] = useState<string>('');
   const [selectedRankingMonth, setSelectedRankingMonth] = useState<string>('');
   const [rankingCriteria, setRankingCriteria] = useState<'amount' | 'quantity'>('amount');
-
-  // Fast & responsive typing with debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setNameTerm(nameInput);
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [nameInput]);
 
   // Reset filter when switching modes
   useEffect(() => {
@@ -47,7 +42,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
   // Extract all release transactions from all products
   const allReleases = useMemo(() => {
-    const releases: (Transaction & { itemName: string, itemBrand: string, itemCode: string, unitPrice: number })[] = [];
+    const releases: (Transaction & { itemId: string, itemName: string, itemBrand: string, itemCode: string, unitPrice: number })[] = [];
     items.forEach(item => {
       item.transactions.forEach(t => {
         if (t.type === 'release' && !t.isDiscarded && !t.isReturned) {
@@ -58,6 +53,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           const { userRemarks } = extractRemarksAndHistory(t);
           releases.push({
             ...t,
+            itemId: item.id,
             remarks: userRemarks || (t.historyRemarks ? '' : t.remarks),
             itemName: item.name,
             itemBrand: item.category || '-',
@@ -102,33 +98,52 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }
   }, [availableYears, availableMonths, selectedRankingYear, selectedRankingMonth]);
 
-  // Filter based on user input (Instantaneous & Type-Aware Strict Match)
+  // Smart & Strict Match Filter
   const filteredReleases = useMemo(() => {
-    const nameMatch = nameInput.toLowerCase().trim();
+    const query = deferredNameInput.toLowerCase().trim();
     const dateMatch = dateTerm.trim(); // YYYY-MM-DD or YYYY or YYYY-MM
 
-    const isSerialQuery = /^AJ[PD]\d+/i.test(nameMatch);
-    const queryDigits = nameMatch.replace(/\D/g, '');
-    const isPhoneQuery = /^\d{4,11}$/.test(nameMatch) || (queryDigits.length >= 4 && /^010/i.test(nameMatch));
+    if (!query && !dateMatch) {
+      return allReleases;
+    }
+
+    const queryDigits = query.replace(/\D/g, '');
+    const isOnlyDigits = /^\d+$/.test(query);
+    const isSerialPrefixQuery = /^AJ[PD]/i.test(query);
 
     return allReleases.filter(r => {
-      let matchesName = true;
-      if (nameMatch !== '') {
-        if (isSerialQuery) {
-          // Serial number query (e.g. AJP03090, AJD00678)
-          const serial = (r.serialNumber || '').toLowerCase().trim();
-          matchesName = serial.includes(nameMatch);
-        } else if (isPhoneQuery) {
-          // Phone digits query (e.g. 5200, 2702, 010-...)
-          const phoneDigits = (r.phoneNumber || '').replace(/\D/g, '');
-          matchesName = phoneDigits.includes(queryDigits);
+      let matchesQuery = true;
+      if (query !== '') {
+        const cust = (r.customerName || '').toLowerCase().trim();
+        const uid = (r.userId || '').toLowerCase().trim();
+        const serial = (r.serialNumber || '').toLowerCase().trim();
+        const serialDigits = serial.replace(/\D/g, '');
+        const phoneRaw = r.phoneNumber || '';
+        const phoneDigits = phoneRaw.replace(/\D/g, '');
+
+        if (isSerialPrefixQuery) {
+          // Explicit serial query (e.g. AJP03489, AJD00105) -> ONLY match serial number
+          matchesQuery = serial.includes(query);
+        } else if (isOnlyDigits) {
+          // Pure number query (e.g. 5200, 3489, 03489, 105, 01012345678)
+          // 1) Match phone number (ends with or contains the digits)
+          const phoneParts = phoneRaw.split(/[\/,]/);
+          const phoneMatch = phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits)) || (queryDigits.length >= 4 && phoneDigits.includes(queryDigits));
+          
+          // 2) Match serial number without prefix (e.g. 3489 -> matches AJP03489 or AJD03489)
+          const serialNum = parseInt(serialDigits, 10);
+          const qNum = parseInt(queryDigits, 10);
+          const serialMatch = serialDigits.includes(queryDigits) || (!isNaN(serialNum) && !isNaN(qNum) && serialNum === qNum) || serial.includes(query);
+
+          // 3) Match user ID or Customer Name if containing the digits
+          const uidMatch = uid.includes(query);
+          const custMatch = cust.includes(query);
+
+          matchesQuery = phoneMatch || serialMatch || uidMatch || custMatch;
         } else {
-          // Customer name or ID query (e.g. '박지성', '김준식', 'MULTY_AX')
-          // STRICT MATCH: ONLY matches current customerName or userId!
-          // NEVER matches remarks, address, originalCustomerName, or other buyers!
-          const cust = (r.customerName || '').toLowerCase().trim();
-          const uid = (r.userId || '').toLowerCase().trim();
-          matchesName = cust.includes(nameMatch) || uid.includes(nameMatch);
+          // Customer Name, User ID or Serial Number text query (e.g. '박지성', '김준식', 'MULTY_AX')
+          // STRICT MATCH: ONLY matches current customerName, userId, or serialNumber
+          matchesQuery = cust.includes(query) || uid.includes(query) || serial.includes(query);
         }
       }
       
@@ -142,30 +157,41 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
         matchesDate = localDateStr.startsWith(dateMatch);
       }
 
-      return matchesName && matchesDate;
+      return matchesQuery && matchesDate;
     });
-  }, [allReleases, nameInput, dateTerm]);
+  }, [allReleases, deferredNameInput, dateTerm]);
 
-  // Box A: Searched Buyer Profile (Phone number, Address, Total spent)
+  // Box A: Searched Buyer Profile Card
   const searchedBuyerProfile = useMemo(() => {
-    const query = (nameInput || nameTerm).trim().toLowerCase();
+    const query = deferredNameInput.trim().toLowerCase();
     if (!query) return null;
 
-    const isSerialQuery = /^AJ[PD]\d+/i.test(query);
     const queryDigits = query.replace(/\D/g, '');
-    const isPhoneQuery = /^\d{4,11}$/.test(query) || (queryDigits.length >= 4 && /^010/i.test(query));
+    const isOnlyDigits = /^\d+$/.test(query);
+    const isSerialPrefixQuery = /^AJ[PD]/i.test(query);
 
     // Strict matching with current buyer only
     const matching = allReleases.filter(r => {
-      if (isSerialQuery) {
-        return (r.serialNumber || '').toLowerCase().trim().includes(query);
-      } else if (isPhoneQuery) {
-        const phoneDigits = (r.phoneNumber || '').replace(/\D/g, '');
-        return phoneDigits.includes(queryDigits);
+      const cust = (r.customerName || '').toLowerCase().trim();
+      const uid = (r.userId || '').toLowerCase().trim();
+      const serial = (r.serialNumber || '').toLowerCase().trim();
+      const serialDigits = serial.replace(/\D/g, '');
+      const phoneRaw = r.phoneNumber || '';
+      const phoneDigits = phoneRaw.replace(/\D/g, '');
+
+      if (isSerialPrefixQuery) {
+        return serial.includes(query);
+      } else if (isOnlyDigits) {
+        const phoneParts = phoneRaw.split(/[\/,]/);
+        const phoneMatch = phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits)) || (queryDigits.length >= 4 && phoneDigits.includes(queryDigits));
+        const serialNum = parseInt(serialDigits, 10);
+        const qNum = parseInt(queryDigits, 10);
+        const serialMatch = serialDigits.includes(queryDigits) || (!isNaN(serialNum) && !isNaN(qNum) && serialNum === qNum) || serial.includes(query);
+        const uidMatch = uid.includes(query);
+        const custMatch = cust.includes(query);
+        return phoneMatch || serialMatch || uidMatch || custMatch;
       } else {
-        const cust = (r.customerName || '').toLowerCase().trim();
-        const uid = (r.userId || '').toLowerCase().trim();
-        return cust.includes(query) || uid.includes(query);
+        return cust.includes(query) || uid.includes(query) || serial.includes(query);
       }
     });
 
@@ -190,9 +216,9 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       lastPurchaseDate: latest.date ? new Date(latest.date).toLocaleDateString() : '-',
       customerUpdatedDate: latest.customerUpdatedDate
     };
-  }, [nameInput, nameTerm, allReleases]);
+  }, [deferredNameInput, allReleases]);
 
-  // Unified Buyer Rankings by Customer Name with accurate period filter
+  // Unified Buyer Rankings by Customer Name
   const buyerRankings = useMemo(() => {
     if (viewMode !== 'ranking' || authRole !== 'admin') return [];
 
@@ -227,7 +253,6 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     periodFiltered.forEach(r => {
       const cName = (r.customerName || '').trim();
       const uId = (r.userId || '').trim();
-      // Group by customer name as primary key
       const key = cName || (uId ? `ID_${uId}` : 'UNKNOWN');
       if (key === 'UNKNOWN') return;
 
@@ -336,7 +361,6 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   // Helper to navigate from ranking to flat list with exact period and name synced
   const handleViewBuyerDetailsFromRanking = (buyerName: string) => {
     setNameInput(buyerName);
-    setNameTerm(buyerName);
     if (rankingPeriod === 'year') {
       setDateTerm(selectedRankingYear);
     } else if (rankingPeriod === 'month') {
@@ -428,16 +452,30 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-4"><SearchIcon className="w-5 h-5 text-slate-300" /></span>
                 <input 
+                  ref={searchInputRef}
                   type="text" 
                   value={nameInput} 
                   onChange={e => setNameInput(e.target.value)} 
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') {
+                      setNameInput('');
+                    }
+                  }}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck="false"
                   placeholder="예: 홍길동, AJP/AJD*****, 0000(전화번호 뒷자리)" 
                   className="w-full pl-12 pr-10 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-base transition-all"
                 />
                 {nameInput && (
                   <button 
-                    onClick={() => { setNameInput(''); setNameTerm(''); }} 
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-300 hover:text-slate-500 cursor-pointer"
+                    type="button"
+                    onClick={() => {
+                      setNameInput('');
+                      searchInputRef.current?.focus();
+                    }} 
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 font-bold text-base cursor-pointer transition-colors"
+                    title="검색어 지우기"
                   >
                     ✕
                   </button>
@@ -760,7 +798,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                       const rankBadge = idx === 0 ? '🥇 1위' : idx === 1 ? '🥈 2위' : idx === 2 ? '🥉 3위' : `${idx + 1}위`;
                       const badgeColor = idx === 0 ? 'bg-amber-100 text-amber-800 border-amber-300 font-extrabold text-sm' : idx === 1 ? 'bg-slate-200 text-slate-800 border-slate-300' : idx === 2 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200';
                       return (
-                        <div key={b.key} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
+                        <div key={`ranking_${b.key}_${idx}`} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
                           <div className="flex justify-between items-start gap-2">
                             <div className="flex items-center gap-2">
                               <span className={`px-2.5 py-1 rounded-xl border text-xs font-black ${badgeColor}`}>
@@ -824,7 +862,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           const rankBadge = idx === 0 ? '🥇 1위' : idx === 1 ? '🥈 2위' : idx === 2 ? '🥉 3위' : `${idx + 1}위`;
                           const badgeColor = idx === 0 ? 'bg-amber-100 text-amber-900 border-amber-300 font-black text-sm shadow-xs' : idx === 1 ? 'bg-slate-200 text-slate-800 border-slate-300 font-black' : idx === 2 ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold' : 'bg-slate-100 text-slate-600 border-slate-200';
                           return (
-                            <tr key={b.key} className="hover:bg-indigo-50/30 transition-colors">
+                            <tr key={`ranking_row_${b.key}_${idx}`} className="hover:bg-indigo-50/30 transition-colors">
                               <td className="px-6 py-5 text-center">
                                 <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-xl border ${badgeColor}`}>
                                   {rankBadge}
@@ -907,7 +945,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 {/* Mobile Flat Card List */}
                 <div className="space-y-4 lg:hidden">
                   {filteredReleases.map((r, i) => (
-                    <div key={r.id || i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
+                    <div key={`card_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${i}`} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
                       <div className="flex justify-between items-start gap-2">
                         <div>
                           <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase tracking-wider border border-indigo-100">
@@ -1024,7 +1062,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {filteredReleases.map((r, i) => (
-                          <tr key={r.id || i} className="hover:bg-indigo-50/30 transition-colors">
+                          <tr key={`row_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${i}`} className="hover:bg-indigo-50/30 transition-colors">
                             <td className="px-6 py-6 font-bold text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
                             <td className="px-6 py-6 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
                             <td className="px-6 py-6">
@@ -1058,7 +1096,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1 flex-wrap">
                                   <p className="font-black text-slate-900">{r.customerName || '-'}</p>
-                                  {r.userId && <span className="bg-slate-100 text-slate-400 text-[9px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                  {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
                                   {r.customerUpdatedDate && (
                                     <span className="bg-indigo-50 text-indigo-600 text-[8px] px-1.5 py-0.5 rounded font-bold border border-indigo-100/60" title={`구매자 정보 수정일: ${r.customerUpdatedDate}`}>
                                       수정: {r.customerUpdatedDate}
@@ -1101,7 +1139,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 {groupedByDate
                   .filter(group => !selectedGroupDate || group.date === selectedGroupDate)
                   .map((group) => (
-                  <div key={group.date} className="bg-white border border-slate-100 rounded-[1.5rem] p-5 sm:p-6 shadow-md space-y-4">
+                  <div key={`group_date_${group.date}`} className="bg-white border border-slate-100 rounded-[1.5rem] p-5 sm:p-6 shadow-md space-y-4">
                     {/* Group Header */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-100 gap-2">
                       <div className="flex items-center gap-2.5">
@@ -1123,7 +1161,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                     {/* Mobile Card List (Grouped by Date) */}
                     <div className="space-y-3 lg:hidden">
                       {group.list.map((r, idx) => (
-                        <div key={r.id || idx} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
+                        <div key={`group_m_card_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${idx}`} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
                           <div className="flex justify-between items-start gap-2">
                             <div>
                               <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[8px] font-black uppercase tracking-wider border border-indigo-100">
@@ -1203,7 +1241,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                           {group.list.map((r, idx) => (
-                            <tr key={r.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                            <tr key={`group_row_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${idx}`} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-4 py-3 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
                               <td className="px-4 py-3">
                                 <div className="flex flex-col">
@@ -1260,7 +1298,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 {groupedByCode
                   .filter(group => !selectedGroupCode || group.code === selectedGroupCode)
                   .map((group) => (
-                  <div key={group.code} className="bg-white border border-slate-100 rounded-[1.5rem] p-5 sm:p-6 shadow-md space-y-4">
+                  <div key={`group_code_${group.code}`} className="bg-white border border-slate-100 rounded-[1.5rem] p-5 sm:p-6 shadow-md space-y-4">
                     {/* Group Header */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-100 gap-2">
                       <div className="flex items-center gap-2.5">
@@ -1282,7 +1320,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                     {/* Mobile Card List (Grouped by Code) */}
                     <div className="space-y-3 lg:hidden">
                       {group.list.map((r, idx) => (
-                        <div key={r.id || idx} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
+                        <div key={`group_code_card_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${idx}`} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
                           <div className="flex justify-between items-start gap-2">
                             <span className="font-bold text-slate-500 text-[11px]">
                               📅 {new Date(r.date).toLocaleDateString()}
@@ -1356,7 +1394,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                           {group.list.map((r, idx) => (
-                            <tr key={r.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                            <tr key={`group_code_row_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${idx}`} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-4 py-3 font-bold text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
                               <td className="px-4 py-3 font-mono font-black text-indigo-400">{r.serialNumber || '-'}</td>
                               {showPrice && (
