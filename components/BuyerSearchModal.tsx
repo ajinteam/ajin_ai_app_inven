@@ -94,20 +94,28 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }
   }, [availableYears, availableMonths, selectedRankingYear, selectedRankingMonth]);
 
-  // Filter based on user input
+  // Filter based on user input (Point 2, 3, 4: Strict current buyer, ID, Phone search)
   const filteredReleases = useMemo(() => {
     const nameMatch = nameTerm.toLowerCase().trim();
-    const dateMatch = dateTerm.trim(); // YYYY-MM-DD
+    const dateMatch = dateTerm.trim(); // YYYY-MM-DD or YYYY or YYYY-MM
+    const queryDigits = nameMatch.replace(/\D/g, '');
 
     return allReleases.filter(r => {
-      const matchesName = nameMatch === '' || 
-        r.customerName?.toLowerCase().includes(nameMatch) || 
-        r.originalCustomerName?.toLowerCase().includes(nameMatch) || 
-        r.userId?.toLowerCase().includes(nameMatch) ||
-        r.phoneNumber?.toLowerCase().includes(nameMatch) ||
-        r.address?.toLowerCase().includes(nameMatch) ||
-        r.serialNumber?.toLowerCase().includes(nameMatch) ||
-        r.originalSerialNumber?.toLowerCase().includes(nameMatch);
+      let matchesName = true;
+      if (nameMatch !== '') {
+        const cust = (r.customerName || '').toLowerCase().trim();
+        const uid = (r.userId || '').toLowerCase().trim();
+        const phoneDigits = (r.phoneNumber || '').replace(/\D/g, '');
+        const serial = (r.serialNumber || '').toLowerCase().trim();
+
+        const matchCust = cust.includes(nameMatch);
+        const matchUid = uid.includes(nameMatch);
+        const matchPhone = queryDigits.length >= 4 ? phoneDigits.includes(queryDigits) : (r.phoneNumber?.toLowerCase().includes(nameMatch) || false);
+        const matchSerial = serial.includes(nameMatch);
+
+        // Match only current customer name, userId, phone number or serial number
+        matchesName = matchCust || matchUid || matchPhone || matchSerial;
+      }
       
       let matchesDate = true;
       if (dateMatch !== '') {
@@ -128,16 +136,20 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     const query = (nameInput || nameTerm).trim().toLowerCase();
     if (!query) return null;
 
-    const matching = allReleases.filter(r => 
-      r.customerName?.toLowerCase().includes(query) ||
-      r.originalCustomerName?.toLowerCase().includes(query) ||
-      r.userId?.toLowerCase().includes(query) ||
-      r.phoneNumber?.toLowerCase().includes(query)
-    );
+    const queryDigits = query.replace(/\D/g, '');
+
+    // Strict matching with current buyer only
+    const matching = allReleases.filter(r => {
+      const cust = (r.customerName || '').toLowerCase().trim();
+      const uid = (r.userId || '').toLowerCase().trim();
+      const phoneDigits = (r.phoneNumber || '').replace(/\D/g, '');
+
+      return cust.includes(query) || uid.includes(query) || (queryDigits.length >= 4 && phoneDigits.includes(queryDigits));
+    });
 
     if (matching.length === 0) return null;
 
-    // Find latest non-empty phone and address
+    // Find latest non-empty phone and address for this buyer
     const withPhone = matching.find(r => !!r.phoneNumber?.trim());
     const withAddress = matching.find(r => !!r.address?.trim());
     const latest = matching[0];
@@ -158,7 +170,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     };
   }, [nameInput, nameTerm, allReleases]);
 
-  // Buyer Rankings (Box B & ranking view)
+  // Point 5: Unified Buyer Rankings by Customer Name with accurate period filter
   const buyerRankings = useMemo(() => {
     if (viewMode !== 'ranking') return [];
 
@@ -193,7 +205,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     periodFiltered.forEach(r => {
       const cName = (r.customerName || '').trim();
       const uId = (r.userId || '').trim();
-      const key = cName ? `${cName}__${uId}` : (uId ? `UID__${uId}` : 'UNKNOWN');
+      // Group by customer name as primary key
+      const key = cName || (uId ? `ID_${uId}` : 'UNKNOWN');
       if (key === 'UNKNOWN') return;
 
       let buyer = buyerMap.get(key);
@@ -213,6 +226,9 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
         buyerMap.set(key, buyer);
       }
 
+      if (!buyer.userId && uId) {
+        buyer.userId = uId;
+      }
       if (!buyer.phoneNumber && r.phoneNumber?.trim()) {
         buyer.phoneNumber = r.phoneNumber.trim();
       }
@@ -295,6 +311,20 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [viewMode, filteredReleases]);
 
+  // Point 5: Helper to navigate from ranking to flat list with exact period and name synced
+  const handleViewBuyerDetailsFromRanking = (buyerName: string) => {
+    setNameInput(buyerName);
+    setNameTerm(buyerName);
+    if (rankingPeriod === 'year') {
+      setDateTerm(selectedRankingYear);
+    } else if (rankingPeriod === 'month') {
+      setDateTerm(selectedRankingMonth);
+    } else {
+      setDateTerm('');
+    }
+    setViewMode('flat');
+  };
+
   const handleExport = () => {
     let csvContent = "\ufeff";
     let filename = "";
@@ -355,50 +385,60 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] animate-fade-in-up flex flex-col h-full max-h-[92vh] overflow-y-auto lg:overflow-hidden">
-        <div className="p-6 sm:p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="p-6 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
           <div>
             <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
               <SearchIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
               구매자 검색 & 랭킹
             </h2>
-            <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">이름, 아이디, 연락처 또는 날짜로 모든 판매 내역 및 VIP 순위를 조회합니다.</p>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">이름, 아이디, 연락처(뒷자리 포함) 또는 날짜로 모든 판매 내역 및 VIP 순위를 조회합니다.</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer">
             <CloseIcon className="w-8 h-8 sm:w-10 sm:h-10" />
           </button>
         </div>
 
-        <div className="p-6 sm:p-8 bg-white border-b border-slate-100 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">구매자 이름 / 아이디 / 연락처 검색</label>
+        <div className="p-5 sm:p-7 bg-white border-b border-slate-100 space-y-4 shrink-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">구매자 이름 / 아이디 / 전화번호(뒷자리) 검색</label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-4"><SearchIcon className="w-5 h-5 text-slate-300" /></span>
                 <input 
                   type="text" 
                   value={nameInput} 
                   onChange={e => setNameInput(e.target.value)} 
-                  placeholder="예: 김준식, AJIN01, 010-1234-5678" 
-                  className="w-full pl-12 pr-10 py-3 sm:py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-base sm:text-lg transition-all"
+                  placeholder="예: 김준식, AJIN01, 5200(뒷자리)" 
+                  className="w-full pl-12 pr-10 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-base transition-all"
                 />
                 {nameInput && (
                   <button 
                     onClick={() => { setNameInput(''); setNameTerm(''); }} 
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-300 hover:text-slate-500"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-300 hover:text-slate-500 cursor-pointer"
                   >
                     ✕
                   </button>
                 )}
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">날짜별 검색</label>
-              <input 
-                type="date" 
-                value={dateTerm} 
-                onChange={e => setDateTerm(e.target.value)} 
-                className="w-full px-4 py-3 sm:py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-base sm:text-lg transition-all"
-              />
+              <div className="flex gap-2">
+                <input 
+                  type="date" 
+                  value={dateTerm} 
+                  onChange={e => setDateTerm(e.target.value)} 
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-base transition-all"
+                />
+                {dateTerm && (
+                  <button
+                    onClick={() => setDateTerm('')}
+                    className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-black hover:bg-slate-200 transition-colors shrink-0"
+                  >
+                    날짜 해제
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -517,7 +557,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             </div>
           )}
 
-          {/* BLUE BOX B: Ranking Control Bar (When ranking mode or selector) */}
+          {/* BLUE BOX B: Ranking Control Bar */}
           {viewMode === 'ranking' && (
             <div className="pt-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 animate-fade-in bg-gradient-to-r from-amber-50/80 to-indigo-50/80 p-4 sm:p-5 rounded-2xl border-2 border-amber-200 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -619,7 +659,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 <select
                   value={selectedGroupDate}
                   onChange={e => setSelectedGroupDate(e.target.value)}
-                  className="flex-grow sm:flex-initial w-full sm:w-[280px] px-3 py-2 text-xs bg-white border-2 border-indigo-200 focus:border-indigo-400 rounded-xl font-bold outline-none shadow-sm transition-all text-slate-700"
+                  className="flex-grow sm:flex-initial w-full sm:w-[280px] px-3 py-2 text-xs bg-white border-2 border-indigo-200 focus:border-indigo-400 rounded-xl font-bold outline-none shadow-sm transition-all text-slate-700 cursor-pointer"
                 >
                   <option value="">📅 전체 날짜 ({groupedByDate.length}개 그룹)</option>
                   {groupedByDate.map(g => (
@@ -655,7 +695,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 <select
                   value={selectedGroupCode}
                   onChange={e => setSelectedGroupCode(e.target.value)}
-                  className="flex-grow sm:flex-initial w-full sm:w-[350px] px-3 py-2 text-xs bg-white border-2 border-indigo-200 focus:border-indigo-400 rounded-xl font-bold outline-none shadow-sm transition-all text-slate-700"
+                  className="flex-grow sm:flex-initial w-full sm:w-[350px] px-3 py-2 text-xs bg-white border-2 border-indigo-200 focus:border-indigo-400 rounded-xl font-bold outline-none shadow-sm transition-all text-slate-700 cursor-pointer"
                 >
                   <option value="">📦 전체 제품코드 ({groupedByCode.length}개 그룹)</option>
                   {groupedByCode.map(g => (
@@ -679,7 +719,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
         </div>
 
         <div className="flex-grow lg:overflow-hidden bg-slate-50/50">
-          <div className="p-6 sm:p-8 scrollbar-hide lg:h-full lg:overflow-y-auto">
+          <div className="p-5 sm:p-7 scrollbar-hide lg:h-full lg:overflow-y-auto">
             {viewMode === 'ranking' ? (
               buyerRankings.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full py-20 opacity-30">
@@ -706,11 +746,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               </div>
                             </div>
                             <button
-                              onClick={() => {
-                                setNameInput(b.customerName);
-                                setNameTerm(b.customerName);
-                                setViewMode('flat');
-                              }}
+                              onClick={() => handleViewBuyerDetailsFromRanking(b.customerName)}
                               className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl font-black text-xs hover:bg-indigo-600 hover:text-white transition-all cursor-pointer"
                             >
                               내역 조회
@@ -821,11 +857,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               </td>
                               <td className="px-6 py-5 text-center">
                                 <button
-                                  onClick={() => {
-                                    setNameInput(b.customerName);
-                                    setNameTerm(b.customerName);
-                                    setViewMode('flat');
-                                  }}
+                                  onClick={() => handleViewBuyerDetailsFromRanking(b.customerName)}
                                   className="px-3.5 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-2xs cursor-pointer"
                                 >
                                   내역 보기
@@ -886,9 +918,6 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">구매자 (대상)</span>
                           <span className="font-black text-slate-800">
                             <div className="flex flex-col">
-                              {r.originalCustomerName && (
-                                <span className="text-[8px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5" title={`이전 구매자: ${r.originalCustomerName}`}>(이전: {r.originalCustomerName})</span>
-                              )}
                               <span>
                                 {r.customerName || '-'}
                                 {r.userId && (
@@ -1001,9 +1030,6 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                             <td className="px-6 py-6 font-black text-lg text-right">{r.quantity} EA</td>
                             <td className="px-6 py-6">
                               <div className="flex flex-col">
-                                {r.originalCustomerName && (
-                                  <span className="text-[10px] text-rose-500 line-through font-bold decoration-rose-500 decoration-1 block mb-0.5" title={`이전 구매자: ${r.originalCustomerName}`}>(이전: {r.originalCustomerName})</span>
-                                )}
                                 <div className="flex items-center gap-1 flex-wrap">
                                   <p className="font-black text-slate-900">{r.customerName || '-'}</p>
                                   {r.userId && <span className="bg-slate-100 text-slate-400 text-[9px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
