@@ -16,9 +16,10 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   const [viewMode, setViewMode] = useState<'flat' | 'grouped' | 'byCode' | 'ranking'>('flat');
   const [selectedGroupDate, setSelectedGroupDate] = useState('');
   const [selectedGroupCode, setSelectedGroupCode] = useState('');
+  const [visibleCount, setVisibleCount] = useState(60);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Use deferred value for smooth 0ms instant typing and backspacing without freezing
+  // Use deferred value for 0ms instant typing and backspacing
   const deferredNameInput = useDeferredValue(nameInput);
 
   // Ranking filters
@@ -27,11 +28,12 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   const [selectedRankingMonth, setSelectedRankingMonth] = useState<string>('');
   const [rankingCriteria, setRankingCriteria] = useState<'amount' | 'quantity'>('amount');
 
-  // Reset filter when switching modes
+  // Reset pagination & filters on mode or search change
   useEffect(() => {
     setSelectedGroupDate('');
     setSelectedGroupCode('');
-  }, [viewMode]);
+    setVisibleCount(60);
+  }, [viewMode, deferredNameInput, dateTerm]);
 
   // If user is not admin and was on ranking view, revert to flat view
   useEffect(() => {
@@ -40,7 +42,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }
   }, [authRole, viewMode]);
 
-  // Extract all release transactions from all products
+  // Extract all release transactions from all products (cached)
   const allReleases = useMemo(() => {
     const releases: (Transaction & { itemId: string, itemName: string, itemBrand: string, itemCode: string, unitPrice: number })[] = [];
     items.forEach(item => {
@@ -98,7 +100,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }
   }, [availableYears, availableMonths, selectedRankingYear, selectedRankingMonth]);
 
-  // Smart & Strict Match Filter
+  // Strict Matching Filter: 4-digit Phone vs 5-digit Serial vs Text
   const filteredReleases = useMemo(() => {
     const query = deferredNameInput.toLowerCase().trim();
     const dateMatch = dateTerm.trim(); // YYYY-MM-DD or YYYY or YYYY-MM
@@ -125,23 +127,27 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           // Explicit serial query (e.g. AJP03489, AJD00105) -> ONLY match serial number
           matchesQuery = serial.includes(query);
         } else if (isOnlyDigits) {
-          // Pure number query (e.g. 5200, 3489, 03489, 105, 01012345678)
-          // 1) Match phone number (ends with or contains the digits)
-          const phoneParts = phoneRaw.split(/[\/,]/);
-          const phoneMatch = phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits)) || (queryDigits.length >= 4 && phoneDigits.includes(queryDigits));
-          
-          // 2) Match serial number without prefix (e.g. 3489 -> matches AJP03489 or AJD03489)
-          const serialNum = parseInt(serialDigits, 10);
-          const qNum = parseInt(queryDigits, 10);
-          const serialMatch = serialDigits.includes(queryDigits) || (!isNaN(serialNum) && !isNaN(qNum) && serialNum === qNum) || serial.includes(query);
-
-          // 3) Match user ID or Customer Name if containing the digits
-          const uidMatch = uid.includes(query);
-          const custMatch = cust.includes(query);
-
-          matchesQuery = phoneMatch || serialMatch || uidMatch || custMatch;
+          if (queryDigits.length === 4) {
+            // Exactly 4 digits (e.g. '0202', '5200') -> STRICTLY Phone number last 4 digits only!
+            // Prevents mixing with partial serial numbers like AJD00202 or AJP02020!
+            const phoneParts = phoneRaw.split(/[\/,]/);
+            matchesQuery = phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits));
+          } else if (queryDigits.length === 5) {
+            // Exactly 5 digits (e.g. '00202', '02020', '03489') -> STRICTLY 5-digit serial number!
+            matchesQuery = serialDigits === queryDigits || serial.includes(query);
+          } else if (queryDigits.length >= 7) {
+            // 7~11 digits -> Full phone number query
+            matchesQuery = phoneDigits.includes(queryDigits);
+          } else {
+            // 1~3 digits -> Exact integer serial number match or endsWith
+            const serialNum = parseInt(serialDigits, 10);
+            const qNum = parseInt(queryDigits, 10);
+            const serialMatch = (!isNaN(serialNum) && !isNaN(qNum) && serialNum === qNum) || serialDigits.endsWith(queryDigits);
+            const uidMatch = uid.includes(query);
+            matchesQuery = serialMatch || uidMatch;
+          }
         } else {
-          // Customer Name, User ID or Serial Number text query (e.g. '박지성', '김준식', 'MULTY_AX')
+          // Text/Name query (e.g. '박지성', '김준식', '홍성민', 'MULTY_AX')
           // STRICT MATCH: ONLY matches current customerName, userId, or serialNumber
           matchesQuery = cust.includes(query) || uid.includes(query) || serial.includes(query);
         }
@@ -160,6 +166,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       return matchesQuery && matchesDate;
     });
   }, [allReleases, deferredNameInput, dateTerm]);
+
+  // Sliced Releases for Instant 0.01s Render Performance
+  const visibleReleases = useMemo(() => {
+    return filteredReleases.slice(0, visibleCount);
+  }, [filteredReleases, visibleCount]);
 
   // Box A: Searched Buyer Profile Card
   const searchedBuyerProfile = useMemo(() => {
@@ -182,14 +193,18 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       if (isSerialPrefixQuery) {
         return serial.includes(query);
       } else if (isOnlyDigits) {
-        const phoneParts = phoneRaw.split(/[\/,]/);
-        const phoneMatch = phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits)) || (queryDigits.length >= 4 && phoneDigits.includes(queryDigits));
-        const serialNum = parseInt(serialDigits, 10);
-        const qNum = parseInt(queryDigits, 10);
-        const serialMatch = serialDigits.includes(queryDigits) || (!isNaN(serialNum) && !isNaN(qNum) && serialNum === qNum) || serial.includes(query);
-        const uidMatch = uid.includes(query);
-        const custMatch = cust.includes(query);
-        return phoneMatch || serialMatch || uidMatch || custMatch;
+        if (queryDigits.length === 4) {
+          const phoneParts = phoneRaw.split(/[\/,]/);
+          return phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits));
+        } else if (queryDigits.length === 5) {
+          return serialDigits === queryDigits || serial.includes(query);
+        } else if (queryDigits.length >= 7) {
+          return phoneDigits.includes(queryDigits);
+        } else {
+          const serialNum = parseInt(serialDigits, 10);
+          const qNum = parseInt(queryDigits, 10);
+          return (!isNaN(serialNum) && !isNaN(qNum) && serialNum === qNum) || serialDigits.endsWith(queryDigits) || uid.includes(query);
+        }
       } else {
         return cust.includes(query) || uid.includes(query) || serial.includes(query);
       }
@@ -218,7 +233,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     };
   }, [deferredNameInput, allReleases]);
 
-  // Unified Buyer Rankings by Customer Name
+  // Unified Buyer Rankings by Customer Name (Calculated only when ranking tab is active)
   const buyerRankings = useMemo(() => {
     if (viewMode !== 'ranking' || authRole !== 'admin') return [];
 
@@ -358,12 +373,12 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [viewMode, filteredReleases]);
 
-  // Helper to navigate from ranking to flat list with exact period and name synced
-  const handleViewBuyerDetailsFromRanking = (buyerName: string) => {
-    setNameInput(buyerName);
-    if (rankingPeriod === 'year') {
+  // Click on Ranking [내역 보기] -> Navigate to Flat list with precise filter
+  const handleViewBuyerDetailsFromRanking = (customerName: string) => {
+    setNameInput(customerName);
+    if (rankingPeriod === 'year' && selectedRankingYear) {
       setDateTerm(selectedRankingYear);
-    } else if (rankingPeriod === 'month') {
+    } else if (rankingPeriod === 'month' && selectedRankingMonth) {
       setDateTerm(selectedRankingMonth);
     } else {
       setDateTerm('');
@@ -371,31 +386,33 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     setViewMode('flat');
   };
 
+  // CSV Export for filtered results or Ranking
   const handleExport = () => {
-    let csvContent = "\ufeff";
-    let filename = "";
+    let csvContent = '\uFEFF';
+    let filename = '';
 
-    if (viewMode === 'ranking') {
+    if (viewMode === 'ranking' && authRole === 'admin') {
       if (buyerRankings.length === 0) return;
-      const headers = ['순위', '구매자명', '아이디', '연락처', '주소', '총 구매금액', '총 구매수량(EA)', '구매건수', '최근 구매일'];
+      const headers = ['순위', '구매자명', '아이디', '연락처', '배송주소', '총구매수량(EA)', '총구매금액(원)', '출고횟수(건)', '주요구매품목'];
       csvContent += headers.join(',') + '\r\n';
+
       buyerRankings.forEach((b, idx) => {
+        const prodSummary = b.products.map(p => `${p.name}(${p.qty})`).join('; ');
         const row = [
-          `${idx + 1}위`,
+          idx + 1,
           b.customerName,
           b.userId || '-',
           b.phoneNumber || '-',
           b.address || '-',
-          b.totalAmount,
           b.totalQty,
+          b.totalAmount,
           b.purchaseCount,
-          new Date(b.lastPurchaseDate).toLocaleDateString()
+          prodSummary
         ];
         csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\r\n';
       });
-      const periodLabel = rankingPeriod === 'all' ? '전체기간' : rankingPeriod === 'year' ? `${selectedRankingYear}년` : `${selectedRankingMonth}월`;
-      const critLabel = rankingCriteria === 'amount' ? '금액순' : '수량순';
-      filename = `구매자_순위_${periodLabel}_${critLabel}_${new Date().toISOString().split('T')[0]}.csv`;
+      const periodTag = rankingPeriod === 'all' ? '전체' : rankingPeriod === 'year' ? `${selectedRankingYear}년` : `${selectedRankingMonth}`;
+      filename = `구매자순위_${periodTag}_${rankingCriteria === 'amount' ? '금액순' : '수량순'}_${new Date().toISOString().split('T')[0]}.csv`;
     } else {
       if (filteredReleases.length === 0) return;
       const headers = ['날짜', '브랜드', '제품명', '일련번호', '수량', '단가', '총금액', '대상자', '아이디', '연락처', '주소', '비고'];
@@ -431,8 +448,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] animate-fade-in-up flex flex-col h-full max-h-[92vh] overflow-y-auto lg:overflow-hidden">
-        {/* Modal Header: Preserved User Modified Titles */}
-        <div className="p-6 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+        {/* Modal Header */}
+        <div className="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
           <div>
             <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
               <SearchIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
@@ -445,7 +462,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           </button>
         </div>
 
-        <div className="p-5 sm:p-7 bg-white border-b border-slate-100 space-y-4 shrink-0">
+        <div className="p-4 sm:p-7 bg-white border-b border-slate-100 space-y-4 shrink-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">구매자 이름 / 아이디 / 전화번호(뒷자리) 검색</label>
@@ -465,7 +482,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   autoCorrect="off"
                   spellCheck="false"
                   placeholder="예: 홍길동, AJP/AJD*****, 0000(전화번호 뒷자리)" 
-                  className="w-full pl-12 pr-10 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-base transition-all"
+                  className="w-full pl-12 pr-10 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-sm sm:text-base transition-all"
                 />
                 {nameInput && (
                   <button 
@@ -489,7 +506,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   type="date" 
                   value={dateTerm} 
                   onChange={e => setDateTerm(e.target.value)} 
-                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-base transition-all"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-sm sm:text-base transition-all"
                 />
                 {dateTerm && (
                   <button
@@ -515,26 +532,26 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               )}
             </div>
             
-            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-              <div className="flex p-1 bg-slate-100 rounded-xl text-xs font-black">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              <div className="flex p-1 bg-slate-100 rounded-xl text-xs font-black overflow-x-auto max-w-full">
                 <button
                   type="button"
                   onClick={() => setViewMode('flat')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${viewMode === 'flat' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${viewMode === 'flat' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   전체 리스트
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode('grouped')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${viewMode === 'grouped' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${viewMode === 'grouped' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   날짜별 그룹화
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode('byCode')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${viewMode === 'byCode' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${viewMode === 'byCode' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   코드별 그룹화
                 </button>
@@ -543,7 +560,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   <button
                     type="button"
                     onClick={() => setViewMode('ranking')}
-                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${viewMode === 'ranking' ? 'bg-indigo-600 text-white shadow-sm' : 'text-amber-600 hover:text-amber-700'}`}
+                    className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer ${viewMode === 'ranking' ? 'bg-indigo-600 text-white shadow-sm' : 'text-amber-600 hover:text-amber-700'}`}
                   >
                     <span>🏆 구매자 순위</span>
                   </button>
@@ -552,15 +569,16 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               <button 
                 onClick={handleExport}
                 disabled={viewMode === 'ranking' ? buyerRankings.length === 0 : filteredReleases.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-xl text-xs font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-xl text-xs font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <DownloadIcon className="w-4 h-4" />
-                결과 엑셀 저장
+                <span className="hidden sm:inline">결과 엑셀 저장</span>
+                <span className="sm:hidden">엑셀</span>
               </button>
             </div>
           </div>
 
-          {/* RED BOX A: Searched Buyer Profile Card (Phone Number & Address) */}
+          {/* Profile Card */}
           {searchedBuyerProfile && (
             <div className="bg-gradient-to-r from-indigo-50/90 via-sky-50/70 to-slate-50 border-2 border-indigo-200 rounded-2xl p-4 sm:p-5 shadow-sm animate-fade-in">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -621,15 +639,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             </div>
           )}
 
-          {/* BLUE BOX B: Ranking Control Bar (Master Admin Only) */}
+          {/* Ranking Control Bar */}
           {viewMode === 'ranking' && authRole === 'admin' && (
             <div className="pt-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 animate-fade-in bg-gradient-to-r from-amber-50/80 to-indigo-50/80 p-4 sm:p-5 rounded-2xl border-2 border-amber-200 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-1 bg-amber-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm">
                     🏆 최고 구매자 순위
                   </span>
-                  <span className="text-xs font-bold text-slate-600">
+                  <span className="text-xs font-bold text-slate-600 hidden sm:inline">
                     기간과 정렬 기준을 선택하세요
                   </span>
                 </div>
@@ -686,7 +704,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 )}
               </div>
 
-              {/* 2 Ranking Criteria: Amount vs Quantity */}
+              {/* Ranking Criteria */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-slate-500">순위 기준:</span>
                 <div className="flex p-1 bg-white rounded-xl border border-indigo-200 text-xs font-black shadow-2xs">
@@ -702,15 +720,16 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                     onClick={() => setRankingCriteria('quantity')}
                     className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${rankingCriteria === 'quantity' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                   >
-                    <span>📦 구매 품목/수량 기준</span>
+                    <span>📦 총 구매 수량 기준</span>
                   </button>
                 </div>
               </div>
             </div>
           )}
 
+          {/* Group Header Controls */}
           {viewMode === 'grouped' && (
-            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 animate-fade-in bg-slate-50/50 p-4 rounded-2xl border-2 border-indigo-50">
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-indigo-50/40 p-4 rounded-2xl border border-indigo-100 animate-fade-in">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="self-start sm:self-auto px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-black uppercase tracking-wider">
                   날짜 필터
@@ -725,10 +744,10 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   onChange={e => setSelectedGroupDate(e.target.value)}
                   className="flex-grow sm:flex-initial w-full sm:w-[280px] px-3 py-2 text-xs bg-white border-2 border-indigo-200 focus:border-indigo-400 rounded-xl font-bold outline-none shadow-sm transition-all text-slate-700 cursor-pointer"
                 >
-                  <option value="">📅 전체 날짜 ({groupedByDate.length}개 그룹)</option>
+                  <option value="">📅 전체 날짜 ({groupedByDate.length}일치 내역)</option>
                   {groupedByDate.map(g => (
                     <option key={g.date} value={g.date}>
-                      {g.date} ({g.list.length}건 / {g.qty.toLocaleString()} EA)
+                      {g.date} ({g.list.length}건, {g.qty}EA)
                     </option>
                   ))}
                 </select>
@@ -746,7 +765,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           )}
 
           {viewMode === 'byCode' && (
-            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 animate-fade-in bg-slate-50/50 p-4 rounded-2xl border-2 border-indigo-50">
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-indigo-50/40 p-4 rounded-2xl border border-indigo-100 animate-fade-in">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="self-start sm:self-auto px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-black uppercase tracking-wider">
                   제품코드 필터
@@ -783,7 +802,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
         </div>
 
         <div className="flex-grow lg:overflow-hidden bg-slate-50/50">
-          <div className="p-5 sm:p-7 scrollbar-hide lg:h-full lg:overflow-y-auto">
+          <div className="p-4 sm:p-7 scrollbar-hide lg:h-full lg:overflow-y-auto">
             {viewMode === 'ranking' && authRole === 'admin' ? (
               buyerRankings.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full py-20 opacity-30">
@@ -944,8 +963,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               <div className="space-y-4">
                 {/* Mobile Flat Card List */}
                 <div className="space-y-4 lg:hidden">
-                  {filteredReleases.map((r, i) => (
-                    <div key={`card_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${i}`} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
+                  {visibleReleases.map((r, i) => (
+                    <div key={`card_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${i}`} className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
                       <div className="flex justify-between items-start gap-2">
                         <div>
                           <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase tracking-wider border border-indigo-100">
@@ -1061,7 +1080,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {filteredReleases.map((r, i) => (
+                        {visibleReleases.map((r, i) => (
                           <tr key={`row_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${i}`} className="hover:bg-indigo-50/30 transition-colors">
                             <td className="px-6 py-6 font-bold text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
                             <td className="px-6 py-6 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
@@ -1098,29 +1117,32 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                                   <p className="font-black text-slate-900">{r.customerName || '-'}</p>
                                   {r.userId && <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
                                   {r.customerUpdatedDate && (
-                                    <span className="bg-indigo-50 text-indigo-600 text-[8px] px-1.5 py-0.5 rounded font-bold border border-indigo-100/60" title={`구매자 정보 수정일: ${r.customerUpdatedDate}`}>
+                                    <span className="bg-indigo-50 text-indigo-600 text-[8px] px-1 py-0.2 rounded font-bold border border-indigo-100/60" title={`수정일: ${r.customerUpdatedDate}`}>
                                       수정: {r.customerUpdatedDate}
                                     </span>
                                   )}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-6 text-xs text-slate-600 max-w-xs">
-                              <div className="flex flex-col gap-0.5">
+                            <td className="px-6 py-6 max-w-xs">
+                              <div className="flex flex-col gap-1 text-xs">
                                 {r.phoneNumber && (
-                                  <span className="font-mono font-bold text-indigo-700">📞 {r.phoneNumber}</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-slate-400">📞</span>
+                                    <span className="font-mono font-bold text-slate-600">{r.phoneNumber}</span>
+                                  </div>
                                 )}
                                 {r.address && (
-                                  <span className="text-slate-700 line-clamp-2">🏠 {r.address}</span>
-                                )}
-                                {!r.phoneNumber && !r.address && (
-                                  <span className="text-slate-300">-</span>
+                                  <div className="flex items-start gap-1">
+                                    <span className="text-slate-400 shrink-0">🏠</span>
+                                    <span className="text-slate-600 truncate">{r.address}</span>
+                                  </div>
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-6 text-xs text-slate-700 font-medium min-w-[180px] max-w-[350px]">
+                            <td className="px-6 py-6 text-xs text-slate-700 font-medium max-w-[250px]">
                               {r.remarks ? (
-                                <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-100 whitespace-pre-wrap break-words leading-relaxed text-xs text-slate-700 font-medium">
+                                <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-100 whitespace-pre-wrap break-words leading-relaxed text-xs text-slate-700 font-medium">
                                   {r.remarks}
                                 </div>
                               ) : (
@@ -1133,8 +1155,22 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                     </table>
                   </div>
                 </div>
+
+                {/* Progressive Load Button */}
+                {visibleCount < filteredReleases.length && (
+                  <div className="text-center pt-4 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount(prev => prev + 60)}
+                      className="px-6 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black rounded-2xl text-xs sm:text-sm border border-indigo-200 shadow-sm transition-all cursor-pointer"
+                    >
+                      + 이전 내역 더보기 ({visibleCount} / {filteredReleases.length}건 표시 중)
+                    </button>
+                  </div>
+                )}
               </div>
             ) : viewMode === 'grouped' ? (
+              /* Grouped by Date View */
               <div className="space-y-6">
                 {groupedByDate
                   .filter(group => !selectedGroupDate || group.date === selectedGroupDate)
@@ -1143,7 +1179,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                     {/* Group Header */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-100 gap-2">
                       <div className="flex items-center gap-2.5">
-                        <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-xl font-mono font-black text-xs sm:text-sm">
+                        <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-xl font-black text-xs sm:text-sm">
                           📅 {group.date}
                         </span>
                         <span className="text-slate-400 text-xs font-bold">
@@ -1152,28 +1188,28 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                       </div>
                       {showPrice && (
                         <div className="text-sm font-black">
-                          <span className="text-slate-400 text-xs uppercase mr-2">구매 금액:</span>
+                          <span className="text-slate-400 text-xs uppercase mr-2">매출 금액:</span>
                           <span className="text-emerald-600 text-base font-extrabold">{group.amount.toLocaleString()}원</span>
                         </div>
                       )}
                     </div>
                     
-                    {/* Mobile Card List (Grouped by Date) */}
+                    {/* Mobile Card List (Grouped) */}
                     <div className="space-y-3 lg:hidden">
                       {group.list.map((r, idx) => (
-                        <div key={`group_m_card_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${idx}`} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
+                        <div key={`group_card_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${idx}`} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-2.5">
                           <div className="flex justify-between items-start gap-2">
                             <div>
-                              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[8px] font-black uppercase tracking-wider border border-indigo-100">
+                              <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[8px] font-black uppercase">
                                 {r.itemBrand}
                               </span>
-                              <div className="flex flex-col mt-1.5">
+                              <div className="mt-1">
                                 {r.itemCode && (
-                                  <span className="text-[9px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded w-fit mb-0.5 border border-indigo-100">
+                                  <span className="text-[9px] font-mono font-bold text-indigo-600 bg-white px-1 py-0.2 rounded border border-indigo-100 mr-1">
                                     [{r.itemCode}]
                                   </span>
                                 )}
-                                <h5 className="font-black text-slate-800 text-xs leading-snug">{r.itemName}</h5>
+                                <span className="font-black text-slate-800 text-xs">{r.itemName}</span>
                               </div>
                             </div>
                             <div className="text-right shrink-0">
@@ -1191,6 +1227,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               <span className="font-black text-slate-700">
                                 {r.customerName || '-'}
                                 {r.userId && <span className="ml-1 bg-slate-100 text-slate-450 text-[8px] px-1 py-0.5 rounded font-black uppercase">{r.userId}</span>}
+                                {r.customerUpdatedDate && (
+                                  <span className="ml-1 bg-indigo-50 text-indigo-600 text-[8px] px-1 py-0.2 rounded font-bold border border-indigo-100/60" title={`수정일: ${r.customerUpdatedDate}`}>
+                                    수정: {r.customerUpdatedDate}
+                                  </span>
+                                )}
                               </span>
                             </div>
                             <div className="text-right">
@@ -1214,7 +1255,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
                           {r.remarks && (
                             <div className="pt-2 border-t border-slate-100/60 text-xs">
-                              <span className="text-[8px] font-bold text-slate-400 block uppercase tracking-wider mb-1">비고</span>
+                              <span className="text-[8px] text-slate-400 font-bold block uppercase tracking-wider mb-1">비고</span>
                               <div className="font-medium text-slate-700 bg-white p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap break-words text-xs leading-relaxed">
                                 {r.remarks}
                               </div>
@@ -1243,15 +1284,13 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                           {group.list.map((r, idx) => (
                             <tr key={`group_row_${r.itemId || ''}_${r.id || ''}_${r.serialNumber || ''}_${idx}`} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-4 py-3 font-black text-indigo-600 uppercase">{r.itemBrand}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex flex-col">
-                                  {r.itemCode && (
-                                    <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1.5 py-0.5 rounded w-fit mb-0.5 border border-indigo-100">
-                                      [{r.itemCode}]
-                                    </span>
-                                  )}
-                                  <span className="font-black text-slate-800 text-xs sm:text-sm">{r.itemName}</span>
-                                </div>
+                              <td className="px-4 py-3 font-bold text-slate-800">
+                                {r.itemCode && (
+                                  <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50/80 px-1 py-0.2 rounded mr-1 border border-indigo-100">
+                                    [{r.itemCode}]
+                                  </span>
+                                )}
+                                {r.itemName}
                               </td>
                               <td className="px-4 py-3 font-mono font-black text-indigo-400">{r.serialNumber || '-'}</td>
                               {showPrice && (
@@ -1294,6 +1333,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 ))}
               </div>
             ) : (
+              /* Grouped by Code View */
               <div className="space-y-6">
                 {groupedByCode
                   .filter(group => !selectedGroupCode || group.code === selectedGroupCode)
