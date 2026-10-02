@@ -76,7 +76,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loginPassword, setLoginPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'part' | 'product' | 'return'>('part');
-  const [activeProductSubCategory, setActiveProductSubCategory] = useState<'ALL' | 'GiL' | 'KATO' | 'TOMIX'>('ALL');
+  const [activeProductSubCategory, setActiveProductSubCategory] = useState<'ALL' | 'GiL' | 'KATO' | 'TOMIX' | 'SOLDOUT'>('ALL');
   
   const [items, setItems] = useState<Item[]>(() => {
     try {
@@ -359,6 +359,14 @@ const App: React.FC = () => {
       partCount: items.filter(i => i.type === 'part').length,
       productCount: items.filter(i => i.type === 'product').length,
     };
+  }, [items]);
+
+  const soldOutProductCount = useMemo(() => {
+    return items.filter(i => i.type === 'product' && calculateStock(i) <= 0).length;
+  }, [items]);
+
+  const inStockProductCount = useMemo(() => {
+    return items.filter(i => i.type === 'product' && calculateStock(i) > 0).length;
   }, [items]);
 
   const allUsedSerials = useMemo(() => {
@@ -848,7 +856,18 @@ const App: React.FC = () => {
     return items.filter(item => {
         const matchesTab = (activeTab === 'part' && item.type === 'part') || (activeTab === 'product' && item.type === 'product');
         if (!matchesTab) return false;
-        if (activeTab === 'product' && activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) return false;
+
+        if (activeTab === 'product') {
+          const stock = calculateStock(item);
+          if (activeProductSubCategory === 'SOLDOUT') {
+            // 품절 목록 탭: 재고가 0 이하인 품목만 표시
+            if (stock > 0) return false;
+          } else {
+            // 일반 탭 (전체, GiL, KATO, TOMIX): 재고가 0 이하인 품목은 품절 목록으로 이동하므로 제외
+            if (stock <= 0) return false;
+            if (activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) return false;
+          }
+        }
 
         const basicMatch = item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term);
         if (basicMatch) return true;
@@ -887,13 +906,15 @@ const App: React.FC = () => {
         csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\r\n';
       });
     } else {
-      headers = activeTab === 'part' ? ['코드', '품명', '도번', '현재재고'] : ['카테고리', '코드', '제품명', '현재재고'];
-      filename = `${activeTab === 'part' ? '부품' : '제품'}_재고_${new Date().toISOString().split('T')[0]}.csv`;
+      headers = activeTab === 'part' ? ['코드', '품명', '도번', '현재재고'] : ['카테고리(브랜드)', '코드', '제품명', '현재재고', '상태'];
+      const subCatName = activeProductSubCategory === 'SOLDOUT' ? '품절_제품' : activeTab === 'part' ? '부품' : `${activeProductSubCategory === 'ALL' ? '전체_제품' : activeProductSubCategory}`;
+      filename = `${subCatName}_재고_${new Date().toISOString().split('T')[0]}.csv`;
       csvContent += headers.join(',') + '\r\n';
       (filteredInventory as Item[]).forEach(item => {
+        const stock = calculateStock(item);
         const row = activeTab === 'part' 
-          ? [item.code, item.name, item.drawingNumber, calculateStock(item)]
-          : [item.category || '-', item.code, item.name, calculateStock(item)];
+          ? [item.code, item.name, item.drawingNumber, stock]
+          : [item.category || '-', item.code, item.name, stock, stock <= 0 ? '품절' : '보유'];
         csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\r\n';
       });
     }
@@ -1005,19 +1026,41 @@ const App: React.FC = () => {
       <main className="container mx-auto p-4 sm:p-8">
         {activeTab === 'product' && (
           <div className="flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar pb-2">
-            {['ALL', 'GiL', 'KATO', 'TOMIX'].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveProductSubCategory(cat as any)}
-                className={`px-6 py-2 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest border-2 transition-all shadow-sm ${
-                  activeProductSubCategory === cat 
-                  ? 'bg-indigo-600 border-indigo-600 text-white' 
-                  : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-100'
-                }`}
-              >
-                {cat === 'ALL' ? '전체 제품' : cat}
-              </button>
-            ))}
+            {[
+              { id: 'ALL', label: '전체 제품', count: inStockProductCount },
+              { id: 'GiL', label: 'GiL', count: items.filter(i => i.type === 'product' && i.category === 'GiL' && calculateStock(i) > 0).length },
+              { id: 'KATO', label: 'KATO', count: items.filter(i => i.type === 'product' && i.category === 'KATO' && calculateStock(i) > 0).length },
+              { id: 'TOMIX', label: 'TOMIX', count: items.filter(i => i.type === 'product' && i.category === 'TOMIX' && calculateStock(i) > 0).length },
+              { id: 'SOLDOUT', label: '품절 목록', count: soldOutProductCount, isSoldOut: true },
+            ].map((cat) => {
+              const isSelected = activeProductSubCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveProductSubCategory(cat.id as any)}
+                  className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest border-2 transition-all shadow-sm flex items-center gap-2 whitespace-nowrap ${
+                    isSelected 
+                      ? cat.isSoldOut 
+                        ? 'bg-rose-600 border-rose-600 text-white shadow-rose-200' 
+                        : 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200' 
+                      : cat.isSoldOut
+                        ? 'bg-rose-50/70 border-rose-200 text-rose-600 hover:bg-rose-100/70'
+                        : 'bg-white border-slate-100 text-slate-400 hover:border-indigo-100'
+                  }`}
+                >
+                  <span>{cat.label}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                    isSelected
+                      ? 'bg-white/20 text-white'
+                      : cat.isSoldOut
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {cat.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -1284,12 +1327,42 @@ const App: React.FC = () => {
                     return (
                       <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
                         <td className="px-4 sm:px-10 py-4 sm:py-7 font-mono text-indigo-600 font-black text-base sm:text-xl">{item.code}</td>
-                        <td className="px-4 sm:px-10 py-4 sm:py-7 font-black text-slate-800 text-sm sm:text-lg">{item.name}</td>
+                        <td className="px-4 sm:px-10 py-4 sm:py-7 font-black text-slate-800 text-sm sm:text-lg">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {item.type === 'product' && (
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black uppercase tracking-wider ${
+                                item.category === 'GiL'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : item.category === 'KATO'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : item.category === 'TOMIX'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                      : 'bg-slate-100 text-slate-700 border border-slate-200'
+                              }`}>
+                                {item.category || '기타'}
+                              </span>
+                            )}
+                            <span>{item.name}</span>
+                            {item.type === 'product' && stock <= 0 && (
+                              <span className="px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 rounded text-[10px] font-black uppercase tracking-wider">
+                                품절
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         {activeTab === 'part' ? (
                           <td className="px-4 sm:px-10 py-4 sm:py-7 text-slate-400 font-mono text-[10px] sm:text-sm uppercase font-bold">{item.drawingNumber || '-'}</td>
                         ) : (
                           <td className="px-4 sm:px-10 py-4 sm:py-7">
-                            <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-wider">{item.category || '-'}</span>
+                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                              item.category === 'GiL'
+                                ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                : item.category === 'KATO'
+                                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                  : item.category === 'TOMIX'
+                                    ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                    : 'bg-slate-100 text-slate-500'
+                            }`}>{item.category || '-'}</span>
                           </td>
                         )}
                         <td className="px-4 sm:px-10 py-4 sm:py-7 text-right">
