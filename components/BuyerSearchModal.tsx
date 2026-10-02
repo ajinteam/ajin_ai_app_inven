@@ -102,9 +102,9 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }
   }, [availableYears, availableMonths, selectedRankingYear, selectedRankingMonth]);
 
-  // Filter based on user input (Type-Aware Strict Match: Customer Name / ID / Phone / Serial)
+  // Filter based on user input (Instantaneous & Type-Aware Strict Match)
   const filteredReleases = useMemo(() => {
-    const nameMatch = nameTerm.toLowerCase().trim();
+    const nameMatch = nameInput.toLowerCase().trim();
     const dateMatch = dateTerm.trim(); // YYYY-MM-DD or YYYY or YYYY-MM
 
     const isSerialQuery = /^AJ[PD]\d+/i.test(nameMatch);
@@ -144,7 +144,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
       return matchesName && matchesDate;
     });
-  }, [allReleases, nameTerm, dateTerm]);
+  }, [allReleases, nameInput, dateTerm]);
 
   // Box A: Searched Buyer Profile (Phone number, Address, Total spent)
   const searchedBuyerProfile = useMemo(() => {

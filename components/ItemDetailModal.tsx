@@ -303,23 +303,41 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     const term = historySearchTerm.toLowerCase().trim();
     const sortedTrans = [...item.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     if (!term) return sortedTrans;
-    
-    // Exact serial match priority
-    const exactMatches = sortedTrans.filter(t => 
-      t.serialNumber?.toLowerCase() === term || 
-      t.originalSerialNumber?.toLowerCase() === term
-    );
-    
-    if (exactMatches.length > 0) return exactMatches;
-    
+
+    const termDigits = term.replace(/\D/g, '');
+    const isOnlyDigits = /^\d+$/.test(term);
+
     return sortedTrans.filter(t => {
-      const serialMatch = t.serialNumber?.toLowerCase() === term || t.originalSerialNumber?.toLowerCase() === term;
-      const otherMatch = t.customerName?.toLowerCase().includes(term) || 
-                         t.originalCustomerName?.toLowerCase().includes(term) || 
-                         t.remarks?.toLowerCase().includes(term) ||
-                         t.userId?.toLowerCase().includes(term);
-      
-      return serialMatch || otherMatch;
+      // 1. Serial Number Match (supports digits only or full serial, e.g. 929, 00929, AJD00929)
+      const serial = (t.serialNumber || '').toLowerCase().trim();
+      const origSerial = (t.originalSerialNumber || '').toLowerCase().trim();
+      const serialDigits = serial.replace(/\D/g, '');
+      const origSerialDigits = origSerial.replace(/\D/g, '');
+
+      let serialMatch = false;
+      if (isOnlyDigits) {
+        const serialNum = parseInt(serialDigits, 10);
+        const termNum = parseInt(termDigits, 10);
+        serialMatch = serialDigits.includes(termDigits) || 
+                      origSerialDigits.includes(termDigits) ||
+                      (!isNaN(serialNum) && !isNaN(termNum) && serialNum === termNum);
+      } else {
+        serialMatch = serial.includes(term) || origSerial.includes(term);
+      }
+
+      // 2. Customer Name, User ID, Remarks, Phone, Address Match
+      const cust = (t.customerName || '').toLowerCase();
+      const origCust = (t.originalCustomerName || '').toLowerCase();
+      const uid = (t.userId || '').toLowerCase();
+      const remarks = (t.remarks || '').toLowerCase();
+      const addr = (t.address || '').toLowerCase();
+      const phoneDigits = (t.phoneNumber || '').replace(/\D/g, '');
+
+      const nameMatch = cust.includes(term) || origCust.includes(term) || uid.includes(term);
+      const remarksMatch = remarks.includes(term) || addr.includes(term);
+      const phoneMatch = termDigits.length >= 4 && phoneDigits.includes(termDigits);
+
+      return serialMatch || nameMatch || remarksMatch || phoneMatch;
     });
   }, [item.transactions, historySearchTerm]);
 
