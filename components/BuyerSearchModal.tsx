@@ -389,9 +389,9 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           <div>
             <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
               <SearchIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
-              구매자 검색 & 랭킹
+              구매자 검색
             </h2>
-            <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">이름, 아이디, 연락처(뒷자리 포함) 또는 날짜로 모든 판매 내역 및 VIP 순위를 조회합니다.</p>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">이름, 아이디, 연락처(뒷자리 포함)를 조회합니다.</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer">
             <CloseIcon className="w-8 h-8 sm:w-10 sm:h-10" />
@@ -408,7 +408,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   type="text" 
                   value={nameInput} 
                   onChange={e => setNameInput(e.target.value)} 
-                  placeholder="예: 김준식, AJIN01, 5200(뒷자리)" 
+                  placeholder="예: 홍길동, AJP/AJD*****, 0000(전화번호 뒷자리)" 
                   className="w-full pl-12 pr-10 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 outline-none font-bold text-base transition-all"
                 />
                 {nameInput && (

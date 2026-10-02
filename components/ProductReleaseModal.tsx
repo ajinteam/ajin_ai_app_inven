@@ -313,7 +313,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
         {/* Modal Header */}
         <div className="px-5 py-4 sm:px-8 sm:py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/70 shrink-0">
           <div>
-            <h2 className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight uppercase">제품 출고 (BETA)</h2>
+            <h2 className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight uppercase">제품 출고 (BETA1002)</h2>
             <p className="text-[10px] sm:text-xs text-slate-400 font-bold">출고 정보 및 품목을 입력하고 하단 출고 완료를 클릭하세요.</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer">
