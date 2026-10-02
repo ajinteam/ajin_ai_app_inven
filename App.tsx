@@ -10,6 +10,7 @@ import DateSalesSearchModal from './components/DateSalesSearchModal';
 import ResaleModal from './components/ResaleModal';
 import { PlusIcon, BoxIcon, SearchIcon, TrashIcon, DownloadIcon, CloudIcon, ServerIcon, SyncIcon, ArrowDownIcon } from './components/icons';
 import { extractRemarksAndHistory, appendHistory } from './utils/historyUtils';
+import { calculateStock } from './utils/stockUtils';
 
 const detectDateInSearch = (text: string): string | null => {
   const clean = text.trim();
@@ -55,20 +56,6 @@ let idCounter = 0;
 const generateId = (prefix: string) => {
   idCounter++;
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}-${idCounter}`;
-};
-
-const calculateStock = (item: Item): number => {
-  return item.transactions.reduce((acc, t) => {
-    if (t.isDiscarded) return acc;
-    if (t.type === 'release') {
-      if (t.customerName && t.customerName.trim() === '대천폐기') {
-        return acc;
-      }
-      return acc - t.quantity;
-    } else {
-      return acc + t.quantity;
-    }
-  }, 0);
 };
 
 const App: React.FC = () => {

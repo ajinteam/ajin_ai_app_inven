@@ -1,8 +1,7 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Item, Transaction } from '../types';
-// Added missing ArrowDownIcon to imports
-import { CloseIcon, PlusIcon, TrashIcon, BoxIcon, ArrowDownIcon } from './icons';
+import { CloseIcon, PlusIcon, TrashIcon, ArrowDownIcon } from './icons';
+import { calculateStock } from '../utils/stockUtils';
 
 interface ProductReleaseModalProps {
   items: Item[];
@@ -39,7 +38,7 @@ const parseSerialRange = (input: string): string[] => {
   const startNum = parseInt(startNumStr, 10);
   const endNum = parseInt(endNumStr, 10);
   if (isNaN(startNum) || isNaN(endNum) || startNum > endNum) return [input.trim()];
-  if (endNum - startNum >= 1000) return [input.trim()]; // 범위 제한
+  if (endNum - startNum >= 1000) return [input.trim()];
   const results: string[] = [];
   const padLength = startNumStr.length;
   for (let i = startNum; i <= endNum; i++) {
@@ -100,7 +99,12 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
   const [releaseList, setReleaseList] = useState<{ itemId: string, name: string, brand: string, quantity: number, serial: string, remarks: string, priceType?: 'general' | 'agency', unitPrice?: number }[]>([]);
   const [priceType, setPriceType] = useState<'general' | 'agency'>('general');
 
-  const filteredProducts = useMemo(() => items.filter(i => i.category === brand), [items, brand]);
+  // Point 1: Filter out items with stock <= 0 (out of stock items are hidden)
+  const filteredProducts = useMemo(() => {
+    return items
+      .filter(i => i.type === 'product' && i.category === brand && calculateStock(i) > 0)
+      .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [items, brand]);
 
   // Serial Number Logic for Selected Product & Brand
   useEffect(() => {
@@ -134,10 +138,9 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
           }
         }
       } catch (e) {
-        // Silent catch for invalid ranges
+        // Silent catch
       }
     } else {
-      // If it doesn't contain '~' but matches AJP/AJD format, and current quantity > 1, auto-expand it!
       const match = trimmedSerial.match(/^(AJP|AJD)(\d+)$/i);
       if (match) {
         const qty = parseInt(quantity, 10);
@@ -173,11 +176,12 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
     const product = selectedProduct;
     if (!product) return;
 
-    let targetSerials: string[] = [serial.toUpperCase().trim()];
+    const trimmedSerial = serial.trim().toUpperCase();
+    let targetSerials: string[] = [trimmedSerial];
     let isRange = false;
     
-    if (serial.includes('~')) {
-      const parsedRange = parseSerialRange(serial.toUpperCase());
+    if (trimmedSerial.includes('~')) {
+      const parsedRange = parseSerialRange(trimmedSerial);
       if (parsedRange.length > 1) {
         targetSerials = parsedRange;
         isRange = true;
@@ -187,11 +191,11 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
     const qty = isRange ? targetSerials.length : (parseInt(quantity, 10) || 0);
     if (qty <= 0) { alert('수량을 확인하세요.'); return; }
 
-    // Check dupes in pending list and DB
+    // Check dupes in pending list and DB for serial numbers
     const usedSerialsInPending = releaseList.map(r => r.serial.toUpperCase());
     const duplicates = targetSerials.filter(s => !!s && (allUsedSerials.includes(s.toUpperCase()) || usedSerialsInPending.includes(s.toUpperCase())));
     if (duplicates.length > 0) { 
-      alert(`중복된 번호가 존재합니다: ${duplicates.slice(0, 3).join(', ')}...`); 
+      alert(`중복된 일련번호가 존재합니다: ${duplicates.slice(0, 3).join(', ')}...`); 
       return; 
     }
 
@@ -209,20 +213,51 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
         unitPrice: currentPrice
       }));
       setReleaseList(prev => [...prev, ...newEntries]);
+    } else if (!trimmedSerial) {
+      // Point 4: 일련번호 없는 동일 품목 추가 시 수량 자동 합산
+      setReleaseList(prev => {
+        const existingIndex = prev.findIndex(r => r.itemId === selectedProductId && r.priceType === priceType && !r.serial.trim());
+        if (existingIndex >= 0) {
+          return prev.map((r, idx) => {
+            if (idx === existingIndex) {
+              const mergedRemarks = [r.remarks, itemRemarks].filter(Boolean).join(' / ');
+              return {
+                ...r,
+                quantity: r.quantity + qty,
+                remarks: mergedRemarks
+              };
+            }
+            return r;
+          });
+        } else {
+          return [...prev, {
+            itemId: selectedProductId,
+            name: product.name,
+            brand: brand,
+            quantity: qty,
+            serial: '',
+            remarks: itemRemarks,
+            priceType: priceType,
+            unitPrice: currentPrice
+          }];
+        }
+      });
     } else {
       setReleaseList(prev => [...prev, {
         itemId: selectedProductId,
         name: product.name,
         brand: brand,
         quantity: qty,
-        serial: serial.toUpperCase(),
+        serial: trimmedSerial,
         remarks: itemRemarks,
         priceType: priceType,
         unitPrice: currentPrice
       }]);
     }
 
-    // Reset selection part
+    // Point 2: 추가 후 제품 선택창 자동 초기화 (빈 상태로 리셋)
+    setSelectedProductId('');
+    setSerial('');
     setQuantity('1');
     setItemRemarks('');
     setPriceType('general');
@@ -243,13 +278,11 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
     const getReleaseDateWithCurrentTime = () => {
       const d = new Date();
       const [yr, mo, dy] = releaseDate.split('-').map(Number);
-      // Create a Date object in local timezone
       const dateObj = new Date(yr, mo - 1, dy, d.getHours(), d.getMinutes(), d.getSeconds());
       return dateObj.toISOString();
     };
 
     const payload = releaseList.map(r => {
-      // Construct remarks: only add brackets if customerInfo.remarks exists
       const prefix = customerInfo.remarks ? `[${customerInfo.remarks}] ` : "";
       const finalRemarks = `${prefix}${r.remarks}`.trim();
 
@@ -262,7 +295,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
           remarks: finalRemarks,
           serialNumber: r.serial,
           customerName: customerInfo.name,
-          userId: customerInfo.userId, // Allow lowercase as is
+          userId: customerInfo.userId,
           phoneNumber: customerInfo.phone,
           address: customerInfo.address,
           priceType: r.priceType,
@@ -276,15 +309,16 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl sm:rounded-[2.5rem] shadow-2xl w-full max-w-4xl animate-fade-in-up flex flex-col my-auto max-h-[95vh]">
-        <div className="p-4 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+      <div className="bg-white rounded-2xl sm:rounded-[2.5rem] shadow-2xl w-full max-w-4xl animate-fade-in-up flex flex-col my-auto max-h-[95vh] overflow-hidden">
+        <div className="p-5 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
           <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight uppercase">제품 출고 (BETA)</h2>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 transition-colors">
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer">
             <CloseIcon className="w-8 h-8" />
           </button>
         </div>
 
-        <div className="flex-grow p-4 sm:p-8 overflow-y-auto space-y-8">
+        {/* Scrollable Container with adequate bottom padding */}
+        <div className="flex-grow p-5 sm:p-8 overflow-y-auto space-y-8 pb-10">
           {/* Customer Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-black text-indigo-600 uppercase tracking-widest border-l-4 border-indigo-600 pl-3">제품출고 정보</h3>
@@ -321,23 +355,41 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
           {/* Item Selector Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-black text-emerald-600 uppercase tracking-widest border-l-4 border-emerald-600 pl-3">품목 추가</h3>
-            <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 space-y-4">
+            <div className="bg-slate-50 p-5 sm:p-6 rounded-[1.5rem] border border-slate-100 space-y-4">
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <label className="w-24 text-xs font-black text-slate-400 uppercase">브랜드</label>
                 <div className="flex gap-2 w-full">
                   {['GiL', 'KATO', 'TOMIX'].map(b => (
-                    <button key={b} type="button" onClick={() => { setBrand(b as any); setSelectedProductId(''); }} className={`flex-1 py-2 rounded-xl text-xs font-black border-2 transition-all ${brand === b ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400'}`}>{b}</button>
+                    <button 
+                      key={b} 
+                      type="button" 
+                      onClick={() => { setBrand(b as any); setSelectedProductId(''); }} 
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-black border-2 transition-all cursor-pointer ${brand === b ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                    >
+                      {b}
+                    </button>
                   ))}
                 </div>
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <label className="w-24 text-xs font-black text-slate-400 uppercase">제품품목</label>
-                <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400">
+                <select 
+                  value={selectedProductId} 
+                  onChange={e => setSelectedProductId(e.target.value)} 
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-slate-800 cursor-pointer"
+                >
                   <option value="">제품을 선택하세요</option>
-                  {filteredProducts.map(p => (
-                    <option key={p.id} value={p.id}>[{p.code}] {p.name}</option>
-                  ))}
+                  {filteredProducts.length === 0 ? (
+                    <option disabled value="">(선택 가능한 재고 보유 품목이 없습니다)</option>
+                  ) : (
+                    filteredProducts.map(p => {
+                      const stock = calculateStock(p);
+                      return (
+                        <option key={p.id} value={p.id}>[{p.code}] {p.name} (재고: {stock}EA)</option>
+                      );
+                    })
+                  )}
                 </select>
               </div>
 
@@ -348,7 +400,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                     <button
                       type="button"
                       onClick={() => setPriceType('general')}
-                      className={`flex-1 py-2 sm:py-3 rounded-xl text-xs font-black border-2 transition-all ${
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-black border-2 transition-all cursor-pointer ${
                         priceType === 'general'
                           ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
                           : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
@@ -359,7 +411,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                     <button
                       type="button"
                       onClick={() => setPriceType('agency')}
-                      className={`flex-1 py-2 sm:py-3 rounded-xl text-xs font-black border-2 transition-all ${
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-black border-2 transition-all cursor-pointer ${
                         priceType === 'agency'
                           ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
                           : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
@@ -374,22 +426,30 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
                   <label className="w-24 text-xs font-black text-slate-400 uppercase">수량</label>
-                  <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="1" dir="ltr" className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400 text-left text-start" />
+                  <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="1" dir="ltr" className="flex-grow px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-black outline-none focus:border-indigo-400 text-left text-start" />
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="w-24 text-xs font-black text-slate-400 uppercase">일련번호</label>
-                  <input value={serial} onChange={e => setSerial(e.target.value.toUpperCase())} dir="ltr" className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-mono font-black text-indigo-600 outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" />
+                  <input value={serial} onChange={e => setSerial(e.target.value.toUpperCase())} dir="ltr" className="flex-grow px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-mono font-black text-indigo-600 outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" placeholder="(선택사항)" />
                 </div>
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <label className="w-24 text-xs font-black text-slate-400 uppercase">비고</label>
-                <div className="flex gap-2 w-full">
-                  <input value={itemRemarks} onChange={e => setItemRemarks(e.target.value)} dir="ltr" className="flex-grow px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" />
-                  <button onClick={handleAddToList} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-indigo-700 transition-all flex items-center gap-2">
-                    <PlusIcon className="w-4 h-4" />추가
-                  </button>
-                </div>
+                <input value={itemRemarks} onChange={e => setItemRemarks(e.target.value)} dir="ltr" className="flex-grow px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-400 text-left text-start placeholder:text-left" placeholder="품목별 특이사항 (선택)" />
+              </div>
+
+              {/* Point 3: Dedicated, prominent button that is never clipped */}
+              <div className="pt-2 flex justify-end">
+                <button 
+                  type="button"
+                  onClick={handleAddToList} 
+                  disabled={!selectedProductId}
+                  className="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black uppercase text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  <span>출고 대기목록에 추가</span>
+                </button>
               </div>
             </div>
           </div>
@@ -407,7 +467,8 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                       <th className="px-4 py-3">수량</th>
                       <th className="px-4 py-3">{showPrice ? '단가' : '구분'}</th>
                       <th className="px-4 py-3">일련번호</th>
-                      <th className="px-4 py-3">작업</th>
+                      <th className="px-4 py-3">비고</th>
+                      <th className="px-4 py-3 text-center">삭제</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -415,31 +476,32 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                       const productItem = items.find(it => it.id === r.itemId);
                       const productCode = productItem?.code;
                       return (
-                        <tr key={i} className="bg-white">
+                        <tr key={i} className="bg-white hover:bg-indigo-50/20">
                           <td className="px-4 py-3 font-black text-indigo-600">{r.brand}</td>
                           <td className="px-4 py-3 font-bold text-slate-700">
                             {productCode ? `[${productCode}] ` : ''}{r.name}
                           </td>
-                          <td className="px-4 py-3 font-black">{r.quantity} EA</td>
-                        <td className="px-4 py-3 font-bold">
-                          <div className="flex flex-col">
-                            {showPrice ? (
-                              <>
-                                <span className="text-slate-700">{(r.unitPrice || 0).toLocaleString()}원</span>
-                                <span className="text-[9px] text-slate-400">({r.priceType === 'agency' ? '대리점' : '일반'})</span>
-                              </>
-                            ) : (
-                              <span className="text-slate-700">{r.priceType === 'agency' ? '대리점용' : '일반'}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-mono font-black text-indigo-600">{r.serial || '-'}</td>
-                        <td className="px-4 py-3">
-                          <button onClick={() => handleRemoveFromList(i)} className="p-2 text-rose-400 hover:bg-rose-50 rounded-lg"><TrashIcon className="w-4 h-4" /></button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          <td className="px-4 py-3 font-black text-slate-900">{r.quantity} EA</td>
+                          <td className="px-4 py-3 font-bold">
+                            <div className="flex flex-col">
+                              {showPrice ? (
+                                <>
+                                  <span className="text-slate-700">{(r.unitPrice || 0).toLocaleString()}원</span>
+                                  <span className="text-[9px] text-slate-400">({r.priceType === 'agency' ? '대리점' : '일반'})</span>
+                                </>
+                              ) : (
+                                <span className="text-slate-700">{r.priceType === 'agency' ? '대리점용' : '일반'}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-mono font-black text-indigo-600">{r.serial || '-'}</td>
+                          <td className="px-4 py-3 text-slate-500 font-medium">{r.remarks || '-'}</td>
+                          <td className="px-4 py-3 text-center">
+                            <button onClick={() => handleRemoveFromList(i)} className="p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg cursor-pointer transition-colors"><TrashIcon className="w-4 h-4" /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -447,11 +509,11 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
           )}
         </div>
 
-        <div className="p-4 sm:p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
-          <button onClick={onClose} className="flex-1 py-4 bg-white text-slate-400 border border-slate-200 font-black rounded-2xl uppercase tracking-widest hover:bg-slate-100 transition-all">닫기</button>
-          <button onClick={handleSubmit} className="flex-[2] py-4 bg-rose-600 text-white font-black rounded-2xl shadow-xl uppercase tracking-widest hover:bg-rose-700 transition-all flex items-center justify-center gap-3">
+        <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
+          <button onClick={onClose} className="flex-1 py-3.5 bg-white text-slate-400 border border-slate-200 font-black rounded-xl uppercase tracking-widest hover:bg-slate-100 transition-all cursor-pointer">닫기</button>
+          <button onClick={handleSubmit} className="flex-[2] py-3.5 bg-rose-600 text-white font-black rounded-xl shadow-lg uppercase tracking-widest hover:bg-rose-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
             <ArrowDownIcon className="w-5 h-5" />
-            출고 완료
+            <span>출고 완료</span>
           </button>
         </div>
       </div>
