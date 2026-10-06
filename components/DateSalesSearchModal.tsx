@@ -188,7 +188,7 @@ export default function DateSalesSearchModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 animate-fade-in">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 animate-fade-in overscroll-contain">
       <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] lg:max-w-[90vw] xl:max-w-[1500px] flex flex-col h-full max-h-[92vh] overflow-y-auto md:overflow-hidden border border-slate-100 animate-fade-in-up">
         {/* Header */}
         <div className="px-6 sm:px-10 py-5 sm:py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">

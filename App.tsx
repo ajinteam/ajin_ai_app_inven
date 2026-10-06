@@ -115,6 +115,37 @@ const App: React.FC = () => {
     transaction: Transaction;
   } | null>(null);
 
+  // Body Scroll Lock: Prevent background page from scrolling while any modal is open
+  const isAnyModalOpen = Boolean(
+    showAddItemModal ||
+    showProductReleaseModal ||
+    showBuyerSearchModal ||
+    showUserManagementModal ||
+    showDateSalesModal ||
+    selectedItemId ||
+    showResalePrompt ||
+    showRestorePrompt ||
+    itemToDelete
+  );
+
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+      document.body.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+      };
+    }
+  }, [isAnyModalOpen]);
+
   const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline'>('loading');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [dataSource, setDataSource] = useState<'cloud' | 'local'>('local');

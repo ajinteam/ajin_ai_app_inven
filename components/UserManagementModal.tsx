@@ -65,8 +65,8 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ users, onUpda
   const userToDelete = users.find(u => u.id === confirmDeleteId);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-2xl sm:rounded-[2.5rem] shadow-2xl w-full max-w-4xl animate-fade-in-up flex flex-col max-h-[90vh] relative">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 overscroll-contain">
+      <div className="bg-white rounded-2xl sm:rounded-[2.5rem] shadow-2xl w-full max-w-4xl animate-fade-in-up flex flex-col max-h-[90vh] relative overscroll-contain">
         
         {/* 삭제 확인 전용 창 (모달 내부 오버레이) */}
         {confirmDeleteId && userToDelete && (

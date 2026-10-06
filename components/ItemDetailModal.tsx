@@ -680,7 +680,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const isDaecheonSpecial = transactionType === 'release' && (customerName?.trim() === '대천AS' || customerName?.trim() === '대천폐기');
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 overscroll-contain">
       <div className="bg-white rounded-2xl sm:rounded-[3rem] shadow-2xl w-full max-w-[95vw] sm:max-w-[90vw] flex flex-col h-full max-h-[98vh] sm:max-h-[95vh] overflow-hidden animate-fade-in-up">
         {showPasswordInput && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">

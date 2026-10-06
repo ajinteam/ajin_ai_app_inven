@@ -88,7 +88,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 font-sans">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 font-sans overscroll-contain">
       <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-2xl w-full max-w-xl animate-fade-in-up overflow-hidden max-h-[98vh] flex flex-col">
         <div className="p-4 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight uppercase">신규 등록</h2>
@@ -97,7 +97,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ onAddItem, onClose, existin
           </button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col flex-grow overflow-hidden">
-          <div className="p-4 sm:p-8 space-y-4 sm:space-y-6 overflow-y-auto">
+          <div className="p-4 sm:p-8 space-y-4 sm:space-y-6 overflow-y-auto overscroll-contain">
             <div className="flex p-1 bg-slate-100 rounded-xl mb-2">
                 <button type="button" onClick={() => setItemType('part')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${itemType === 'part' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>부품</button>
                 <button type="button" onClick={() => setItemType('product')} className={`flex-1 py-2 sm:py-3 text-[10px] sm:text-sm font-black rounded-lg transition-all ${itemType === 'product' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>제품</button>

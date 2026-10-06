@@ -66,8 +66,8 @@ export default function ResaleModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[80] flex items-center justify-center p-4">
-      <div className="bg-white rounded-[2rem] p-8 max-w-lg w-full shadow-2xl border border-slate-100 animate-fade-in-up">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[80] flex items-center justify-center p-4 overscroll-contain">
+      <div className="bg-white rounded-[2rem] p-8 max-w-lg w-full shadow-2xl border border-slate-100 animate-fade-in-up overscroll-contain">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h4 className="text-2xl font-black text-slate-800 tracking-tight uppercase">제품 재판매 처리</h4>

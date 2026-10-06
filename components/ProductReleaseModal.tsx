@@ -308,7 +308,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-2 sm:p-4 overflow-y-auto overscroll-contain">
       <div className="bg-white rounded-2xl sm:rounded-[2.5rem] shadow-2xl w-full max-w-5xl animate-fade-in-up flex flex-col my-auto max-h-[96vh] overflow-hidden">
         {/* Modal Header */}
         <div className="px-5 py-4 sm:px-8 sm:py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/70 shrink-0">
@@ -322,7 +322,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
         </div>
 
         {/* Scrollable Body */}
-        <div className="flex-grow p-4 sm:p-6 overflow-y-auto space-y-5">
+        <div className="flex-grow p-4 sm:p-6 overflow-y-auto space-y-5 overscroll-contain">
           {/* Top Section: Customer Info (Compact 3-column Grid) */}
           <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-100 space-y-3">
             <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest border-l-3 border-indigo-600 pl-2.5">
