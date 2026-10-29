@@ -8,9 +8,10 @@ interface BuyerSearchModalProps {
   onClose: () => void;
   showPrice?: boolean;
   authRole?: 'admin' | 'product_only' | 'custom' | null;
+  canViewRanking?: boolean;
 }
 
-const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, showPrice = false, authRole = null }) => {
+const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, showPrice = false, authRole = null, canViewRanking = false }) => {
   const [nameInput, setNameInput] = useState('');
   const [dateTerm, setDateTerm] = useState('');
   const [viewMode, setViewMode] = useState<'flat' | 'grouped' | 'byCode' | 'ranking'>('flat');
@@ -18,6 +19,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   const [selectedGroupCode, setSelectedGroupCode] = useState('');
   const [visibleCount, setVisibleCount] = useState(60);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const canAccessRanking = authRole === 'admin' || !!canViewRanking;
 
   // Use deferred value for 0ms instant typing and backspacing
   const deferredNameInput = useDeferredValue(nameInput);
@@ -35,12 +38,12 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     setVisibleCount(60);
   }, [viewMode, deferredNameInput, dateTerm]);
 
-  // If user is not admin and was on ranking view, revert to flat view
+  // If user does not have permission and was on ranking view, revert to flat view
   useEffect(() => {
-    if (authRole !== 'admin' && viewMode === 'ranking') {
+    if (!canAccessRanking && viewMode === 'ranking') {
       setViewMode('flat');
     }
-  }, [authRole, viewMode]);
+  }, [canAccessRanking, viewMode]);
 
   // Extract all release transactions from all products (cached)
   const allReleases = useMemo(() => {
@@ -391,7 +394,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     let csvContent = '\uFEFF';
     let filename = '';
 
-    if (viewMode === 'ranking' && authRole === 'admin') {
+    if (viewMode === 'ranking' && canAccessRanking) {
       if (buyerRankings.length === 0) return;
       const headers = ['순위', '구매자명', '아이디', '연락처', '배송주소', '총구매수량(EA)', '총구매금액(원)', '출고횟수(건)', '주요구매품목'];
       csvContent += headers.join(',') + '\r\n';
@@ -555,8 +558,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 >
                   코드별 그룹화
                 </button>
-                {/* Master Admin Only: Ranking View */}
-                {authRole === 'admin' && (
+                {/* Ranking View: Master Admin or Authorized User */}
+                {canAccessRanking && (
                   <button
                     type="button"
                     onClick={() => setViewMode('ranking')}

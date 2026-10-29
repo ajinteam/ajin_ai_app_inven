@@ -436,18 +436,19 @@ const App: React.FC = () => {
     e.preventDefault();
     
     const checkCredentials = (password: string, userList: User[]) => {
-      if (password === ADMIN_PASSWORD) {
+      const cleanPass = password.trim().toLowerCase();
+      if (cleanPass === ADMIN_PASSWORD.toLowerCase()) {
         setAuthRole('admin');
-        setCurrentUser({ id: 'admin', name: 'ADMINISTRATOR', password: ADMIN_PASSWORD, partPermission: 'edit', productPermission: 'edit', showPricePermission: true });
+        setCurrentUser({ id: 'admin', name: 'ADMINISTRATOR', password: ADMIN_PASSWORD, partPermission: 'edit', productPermission: 'edit', showPricePermission: true, buyerRankingPermission: true });
         setActiveTab('part');
         return true;
-      } else if (password === PRODUCT_ONLY_PASSWORD) {
+      } else if (cleanPass === PRODUCT_ONLY_PASSWORD.toLowerCase()) {
         setAuthRole('product_only');
         setCurrentUser({ id: 'product_only', name: 'PRODUCT MANAGER', password: PRODUCT_ONLY_PASSWORD, partPermission: 'none', productPermission: 'edit' });
         setActiveTab('product');
         return true;
       } else {
-        const foundUser = userList.find(u => u.password === password);
+        const foundUser = userList.find(u => (u.password || '').trim().toLowerCase() === cleanPass);
         if (foundUser) {
           setAuthRole('custom');
           setCurrentUser(foundUser);
@@ -514,10 +515,11 @@ const App: React.FC = () => {
   };
 
   const handleDeleteItemConfirm = () => {
+    const cleanPass = deletePassword.trim().toLowerCase();
     const isPassValid = 
-      (authRole === 'admin' && deletePassword === ADMIN_PASSWORD) ||
-      (deletePassword === ADMIN_PASSWORD) ||
-      (deletePassword === currentUser?.password);
+      (authRole === 'admin' && cleanPass === ADMIN_PASSWORD.toLowerCase()) ||
+      (cleanPass === ADMIN_PASSWORD.toLowerCase()) ||
+      (cleanPass === (currentUser?.password || '').trim().toLowerCase());
     if (!isPassValid) {
       alert('비밀번호가 틀렸습니다.');
       return;
@@ -1519,6 +1521,7 @@ const App: React.FC = () => {
           onClose={() => setShowBuyerSearchModal(false)} 
           showPrice={showPrice}
           authRole={authRole}
+          canViewRanking={currentUser?.id === 'admin' || currentUser?.buyerRankingPermission === true}
         />
       )}
       {showUserManagementModal && (

@@ -58,4 +58,5 @@ export interface User {
   partPermission: 'read' | 'edit' | 'none';
   productPermission: 'read' | 'edit' | 'none';
   showPricePermission?: boolean;
+  buyerRankingPermission?: boolean;
 }
