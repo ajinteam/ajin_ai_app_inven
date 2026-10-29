@@ -31,6 +31,12 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   const [selectedRankingMonth, setSelectedRankingMonth] = useState<string>('');
   const [rankingCriteria, setRankingCriteria] = useState<'amount' | 'quantity'>('amount');
 
+  // History tracking for navigating from Ranking -> Details
+  const [cameFromRanking, setCameFromRanking] = useState<{
+    previousNameInput: string;
+    previousDateTerm: string;
+  } | null>(null);
+
   // Reset pagination & filters on mode or search change
   useEffect(() => {
     setSelectedGroupDate('');
@@ -236,9 +242,9 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     };
   }, [deferredNameInput, allReleases]);
 
-  // Unified Buyer Rankings by Customer Name (Calculated only when ranking tab is active)
+  // Unified Buyer Rankings by Customer Name (Calculated whenever ranking permission is available)
   const buyerRankings = useMemo(() => {
-    if (viewMode !== 'ranking' || !canAccessRanking) return [];
+    if (!canAccessRanking) return [];
 
     const periodFiltered = allReleases.filter(r => {
       if (rankingPeriod === 'all') return true;
@@ -320,8 +326,50 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       list.sort((a, b) => b.totalQty - a.totalQty || b.totalAmount - a.totalAmount);
     }
 
-    return list;
-  }, [viewMode, canAccessRanking, allReleases, rankingPeriod, selectedRankingYear, selectedRankingMonth, rankingCriteria]);
+    return list.map((b, idx) => ({
+      ...b,
+      originalRank: idx + 1
+    }));
+  }, [canAccessRanking, allReleases, rankingPeriod, selectedRankingYear, selectedRankingMonth, rankingCriteria]);
+
+  // Filtered Buyer Rankings: filters ranking by user search input while preserving original rank
+  const filteredBuyerRankings = useMemo(() => {
+    const query = deferredNameInput.toLowerCase().trim();
+    if (!query) return buyerRankings;
+
+    const queryDigits = query.replace(/\D/g, '');
+    const isOnlyDigits = /^\d+$/.test(query);
+
+    return buyerRankings.filter(b => {
+      const cust = (b.customerName || '').toLowerCase().trim();
+      const uid = (b.userId || '').toLowerCase().trim();
+      const phoneRaw = b.phoneNumber || '';
+      const phoneDigits = phoneRaw.replace(/\D/g, '');
+      const addr = (b.address || '').toLowerCase().trim();
+
+      if (isOnlyDigits) {
+        if (queryDigits.length === 4) {
+          const phoneParts = phoneRaw.split(/[\/,]/);
+          return phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits));
+        } else if (queryDigits.length >= 7) {
+          return phoneDigits.includes(queryDigits);
+        } else {
+          return phoneDigits.includes(queryDigits) || uid.includes(query);
+        }
+      }
+
+      return cust.includes(query) || uid.includes(query) || phoneRaw.includes(query) || addr.includes(query);
+    });
+  }, [buyerRankings, deferredNameInput]);
+
+  // Rank info for the currently searched buyer in profile card
+  const searchedBuyerRankInfo = useMemo(() => {
+    if (!canAccessRanking || !searchedBuyerProfile || buyerRankings.length === 0) return null;
+    return buyerRankings.find(b => 
+      (b.customerName && searchedBuyerProfile.customerName && b.customerName.toLowerCase().trim() === searchedBuyerProfile.customerName.toLowerCase().trim()) ||
+      (b.userId && searchedBuyerProfile.userId && b.userId.toLowerCase().trim() === searchedBuyerProfile.userId.toLowerCase().trim())
+    );
+  }, [canAccessRanking, searchedBuyerProfile, buyerRankings]);
 
   const totalSalesAmount = useMemo(() => {
     return filteredReleases.reduce((sum, r) => {
@@ -378,6 +426,10 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
   // Click on Ranking [내역 보기] -> Navigate to Flat list with precise filter
   const handleViewBuyerDetailsFromRanking = (customerName: string) => {
+    setCameFromRanking({
+      previousNameInput: nameInput,
+      previousDateTerm: dateTerm,
+    });
     setNameInput(customerName);
     if (rankingPeriod === 'year' && selectedRankingYear) {
       setDateTerm(selectedRankingYear);
@@ -395,16 +447,17 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     let filename = '';
 
     if (viewMode === 'ranking' && canAccessRanking) {
-      if (buyerRankings.length === 0) return;
+      const exportList = filteredBuyerRankings.length > 0 ? filteredBuyerRankings : buyerRankings;
+      if (exportList.length === 0) return;
       const headers = showPrice
         ? ['순위', '구매자명', '아이디', '연락처', '배송주소', '총구매수량(EA)', '총구매금액(원)', '출고횟수(건)', '주요구매품목']
         : ['순위', '구매자명', '아이디', '연락처', '배송주소', '총구매수량(EA)', '출고횟수(건)', '주요구매품목'];
       csvContent += headers.join(',') + '\r\n';
 
-      buyerRankings.forEach((b, idx) => {
+      exportList.forEach((b) => {
         const prodSummary = b.products.map(p => `${p.name}(${p.qty})`).join('; ');
         const row = showPrice ? [
-          idx + 1,
+          b.originalRank,
           b.customerName,
           b.userId || '-',
           b.phoneNumber || '-',
@@ -414,7 +467,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           b.purchaseCount,
           prodSummary
         ] : [
-          idx + 1,
+          b.originalRank,
           b.customerName,
           b.userId || '-',
           b.phoneNumber || '-',
@@ -586,7 +639,10 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 {canAccessRanking && (
                   <button
                     type="button"
-                    onClick={() => setViewMode('ranking')}
+                    onClick={() => {
+                      setCameFromRanking(null);
+                      setViewMode('ranking');
+                    }}
                     className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer ${viewMode === 'ranking' ? 'bg-indigo-600 text-white shadow-sm' : 'text-amber-600 hover:text-amber-700'}`}
                   >
                     <span>🏆 구매자 순위</span>
@@ -595,7 +651,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               </div>
               <button 
                 onClick={handleExport}
-                disabled={viewMode === 'ranking' ? buyerRankings.length === 0 : filteredReleases.length === 0}
+                disabled={viewMode === 'ranking' ? filteredBuyerRankings.length === 0 : filteredReleases.length === 0}
                 className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-xl text-xs font-black hover:bg-emerald-600 hover:text-white transition-all uppercase shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <DownloadIcon className="w-4 h-4" />
@@ -604,6 +660,35 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
               </button>
             </div>
           </div>
+
+          {/* Came From Ranking Navigation Return Banner */}
+          {cameFromRanking && viewMode !== 'ranking' && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-amber-50 via-indigo-50 to-white border-2 border-indigo-200 rounded-2xl p-3.5 sm:p-4 shadow-sm animate-fade-in">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🏆</span>
+                <div>
+                  <p className="text-xs sm:text-sm font-black text-slate-900">
+                    구매자 순위에서 <span className="text-indigo-600 font-extrabold">[{nameInput || '선택한 고객'}]</span>님의 출고 내역을 확인 중입니다
+                  </p>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    내역 확인 후 아래 버튼을 누르면 이전 순위 목록 및 검색 조건으로 바로 복귀합니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setNameInput(cameFromRanking.previousNameInput);
+                  setDateTerm(cameFromRanking.previousDateTerm);
+                  setCameFromRanking(null);
+                  setViewMode('ranking');
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-black shadow-md transition-all shrink-0 cursor-pointer w-full sm:w-auto justify-center"
+              >
+                <span>← 구매자 순위 목록으로 돌아가기</span>
+              </button>
+            </div>
+          )}
 
           {/* Profile Card */}
           {searchedBuyerProfile && (
@@ -646,7 +731,19 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-indigo-100">
+                <div className="flex items-center gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-indigo-100 flex-wrap">
+                  {canAccessRanking && searchedBuyerRankInfo && (
+                    <div className="bg-white px-3.5 py-2 rounded-xl border border-amber-200 shadow-2xs text-right">
+                      <span className="text-[10px] font-bold text-amber-600 block uppercase">
+                        {rankingPeriod === 'all' ? '전체 순위' : rankingPeriod === 'year' ? `${selectedRankingYear}년 순위` : `${selectedRankingMonth} 순위`}
+                      </span>
+                      <span className="text-xs sm:text-sm font-black text-slate-800 flex items-center justify-end gap-1">
+                        <span>{searchedBuyerRankInfo.originalRank === 1 ? '🥇' : searchedBuyerRankInfo.originalRank === 2 ? '🥈' : searchedBuyerRankInfo.originalRank === 3 ? '🥉' : '🏆'}</span>
+                        <span className="text-indigo-600 font-extrabold">{searchedBuyerRankInfo.originalRank}위</span>
+                        <span className="text-[10px] text-slate-400 font-medium">/ {buyerRankings.length}명</span>
+                      </span>
+                    </div>
+                  )}
                   <div className="bg-white px-3.5 py-2 rounded-xl border border-indigo-100 shadow-2xs text-right">
                     <span className="text-[10px] font-bold text-slate-400 block uppercase">총 구매 내역</span>
                     <span className="text-xs sm:text-sm font-black text-slate-800">
@@ -836,15 +933,21 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   <span className="text-6xl mb-4">🏆</span>
                   <p className="text-xl sm:text-2xl font-black uppercase tracking-widest text-center text-slate-700">해당 기간의 구매자 랭킹 데이터가 없습니다</p>
                 </div>
+              ) : filteredBuyerRankings.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full py-20 opacity-30">
+                  <span className="text-6xl mb-4">🔍</span>
+                  <p className="text-xl sm:text-2xl font-black uppercase tracking-widest text-center text-slate-700">검색 조건에 맞는 구매자가 순위에 없습니다</p>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {/* Mobile Ranking Cards */}
                   <div className="space-y-4 lg:hidden">
-                    {buyerRankings.map((b, idx) => {
-                      const rankBadge = idx === 0 ? '🥇 1위' : idx === 1 ? '🥈 2위' : idx === 2 ? '🥉 3위' : `${idx + 1}위`;
-                      const badgeColor = idx === 0 ? 'bg-amber-100 text-amber-800 border-amber-300 font-extrabold text-sm' : idx === 1 ? 'bg-slate-200 text-slate-800 border-slate-300' : idx === 2 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200';
+                    {filteredBuyerRankings.map((b) => {
+                      const rank = b.originalRank;
+                      const rankBadge = rank === 1 ? '🥇 1위' : rank === 2 ? '🥈 2위' : rank === 3 ? '🥉 3위' : `${rank}위`;
+                      const badgeColor = rank === 1 ? 'bg-amber-100 text-amber-800 border-amber-300 font-extrabold text-sm' : rank === 2 ? 'bg-slate-200 text-slate-800 border-slate-300' : rank === 3 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200';
                       return (
-                        <div key={`ranking_${b.key}_${idx}`} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
+                        <div key={`ranking_${b.key}_${rank}`} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md space-y-3">
                           <div className="flex justify-between items-start gap-2">
                             <div className="flex items-center gap-2">
                               <span className={`px-2.5 py-1 rounded-xl border text-xs font-black ${badgeColor}`}>
@@ -906,11 +1009,12 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {buyerRankings.map((b, idx) => {
-                          const rankBadge = idx === 0 ? '🥇 1위' : idx === 1 ? '🥈 2위' : idx === 2 ? '🥉 3위' : `${idx + 1}위`;
-                          const badgeColor = idx === 0 ? 'bg-amber-100 text-amber-900 border-amber-300 font-black text-sm shadow-xs' : idx === 1 ? 'bg-slate-200 text-slate-800 border-slate-300 font-black' : idx === 2 ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold' : 'bg-slate-100 text-slate-600 border-slate-200';
+                        {filteredBuyerRankings.map((b) => {
+                          const rank = b.originalRank;
+                          const rankBadge = rank === 1 ? '🥇 1위' : rank === 2 ? '🥈 2위' : rank === 3 ? '🥉 3위' : `${rank}위`;
+                          const badgeColor = rank === 1 ? 'bg-amber-100 text-amber-900 border-amber-300 font-black text-sm shadow-xs' : rank === 2 ? 'bg-slate-200 text-slate-800 border-slate-300 font-black' : rank === 3 ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold' : 'bg-slate-100 text-slate-600 border-slate-200';
                           return (
-                            <tr key={`ranking_row_${b.key}_${idx}`} className="hover:bg-indigo-50/30 transition-colors">
+                            <tr key={`ranking_row_${b.key}_${rank}`} className="hover:bg-indigo-50/30 transition-colors">
                               <td className="px-6 py-5 text-center">
                                 <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-xl border ${badgeColor}`}>
                                   {rankBadge}

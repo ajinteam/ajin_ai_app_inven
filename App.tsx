@@ -883,8 +883,10 @@ const App: React.FC = () => {
             // 품절 목록 탭: 재고가 0 이하인 품목만 표시
             if (stock > 0) return false;
           } else {
-            // 일반 탭 (전체, GiL, KATO, TOMIX): 재고가 0 이하인 품목은 품절 목록으로 이동하므로 제외
-            if (stock <= 0) return false;
+            // 일반 탭 (전체, GiL, KATO, TOMIX):
+            // 검색어가 없을 때는 재고가 0 이하인 품목을 품절 목록으로 분리하므로 제외.
+            // 단, 사용자가 검색어(term)를 입력한 경우 구매자가 구매한 품목(품절 포함)을 확인할 수 있도록 품절 품목도 포함.
+            if (!term && stock <= 0) return false;
             if (activeProductSubCategory !== 'ALL' && item.category !== activeProductSubCategory) return false;
           }
         }
