@@ -238,7 +238,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
   // Unified Buyer Rankings by Customer Name (Calculated only when ranking tab is active)
   const buyerRankings = useMemo(() => {
-    if (viewMode !== 'ranking' || authRole !== 'admin') return [];
+    if (viewMode !== 'ranking' || !canAccessRanking) return [];
 
     const periodFiltered = allReleases.filter(r => {
       if (rankingPeriod === 'all') return true;
@@ -321,7 +321,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }
 
     return list;
-  }, [viewMode, authRole, allReleases, rankingPeriod, selectedRankingYear, selectedRankingMonth, rankingCriteria]);
+  }, [viewMode, canAccessRanking, allReleases, rankingPeriod, selectedRankingYear, selectedRankingMonth, rankingCriteria]);
 
   const totalSalesAmount = useMemo(() => {
     return filteredReleases.reduce((sum, r) => {
@@ -396,12 +396,14 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
     if (viewMode === 'ranking' && canAccessRanking) {
       if (buyerRankings.length === 0) return;
-      const headers = ['순위', '구매자명', '아이디', '연락처', '배송주소', '총구매수량(EA)', '총구매금액(원)', '출고횟수(건)', '주요구매품목'];
+      const headers = showPrice
+        ? ['순위', '구매자명', '아이디', '연락처', '배송주소', '총구매수량(EA)', '총구매금액(원)', '출고횟수(건)', '주요구매품목']
+        : ['순위', '구매자명', '아이디', '연락처', '배송주소', '총구매수량(EA)', '출고횟수(건)', '주요구매품목'];
       csvContent += headers.join(',') + '\r\n';
 
       buyerRankings.forEach((b, idx) => {
         const prodSummary = b.products.map(p => `${p.name}(${p.qty})`).join('; ');
-        const row = [
+        const row = showPrice ? [
           idx + 1,
           b.customerName,
           b.userId || '-',
@@ -411,6 +413,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           b.totalAmount,
           b.purchaseCount,
           prodSummary
+        ] : [
+          idx + 1,
+          b.customerName,
+          b.userId || '-',
+          b.phoneNumber || '-',
+          b.address || '-',
+          b.totalQty,
+          b.purchaseCount,
+          prodSummary
         ];
         csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\r\n';
       });
@@ -418,11 +429,13 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       filename = `구매자순위_${periodTag}_${rankingCriteria === 'amount' ? '금액순' : '수량순'}_${new Date().toISOString().split('T')[0]}.csv`;
     } else {
       if (filteredReleases.length === 0) return;
-      const headers = ['날짜', '브랜드', '제품명', '일련번호', '수량', '단가', '총금액', '대상자', '아이디', '연락처', '주소', '비고'];
+      const headers = showPrice
+        ? ['날짜', '브랜드', '제품명', '일련번호', '수량', '단가', '총금액', '대상자', '아이디', '연락처', '주소', '비고']
+        : ['날짜', '브랜드', '제품명', '일련번호', '수량', '대상자', '아이디', '연락처', '주소', '비고'];
       csvContent += headers.join(',') + '\r\n';
       
       filteredReleases.forEach(r => {
-        const row = [
+        const row = showPrice ? [
           new Date(r.date).toLocaleDateString(),
           r.itemBrand,
           r.itemName,
@@ -430,6 +443,17 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           r.quantity,
           r.unitPrice || 0,
           r.quantity * (r.unitPrice || 0),
+          r.customerName || '-',
+          r.userId || '-',
+          r.phoneNumber || '-',
+          r.address || '-',
+          r.remarks || '-'
+        ] : [
+          new Date(r.date).toLocaleDateString(),
+          r.itemBrand,
+          r.itemName,
+          r.serialNumber || '-',
+          r.quantity,
           r.customerName || '-',
           r.userId || '-',
           r.phoneNumber || '-',
@@ -643,7 +667,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           )}
 
           {/* Ranking Control Bar */}
-          {viewMode === 'ranking' && authRole === 'admin' && (
+          {viewMode === 'ranking' && canAccessRanking && (
             <div className="pt-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 animate-fade-in bg-gradient-to-r from-amber-50/80 to-indigo-50/80 p-4 sm:p-5 rounded-2xl border-2 border-amber-200 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
@@ -806,7 +830,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
         <div className="flex-grow lg:overflow-hidden bg-slate-50/50">
           <div className="p-4 sm:p-7 scrollbar-hide lg:h-full lg:overflow-y-auto">
-            {viewMode === 'ranking' && authRole === 'admin' ? (
+            {viewMode === 'ranking' && canAccessRanking ? (
               buyerRankings.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full py-20 opacity-30">
                   <span className="text-6xl mb-4">🏆</span>
@@ -850,15 +874,17 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 text-xs">
+                          <div className={`grid ${showPrice ? 'grid-cols-2' : 'grid-cols-1'} gap-3 pt-2 border-t border-slate-100 text-xs`}>
                             <div>
                               <span className="text-[10px] font-bold text-slate-400 block uppercase">총 구매 수량</span>
                               <span className="font-black text-slate-900 text-sm">{b.totalQty.toLocaleString()} EA ({b.purchaseCount}건)</span>
                             </div>
-                            <div className="text-right">
-                              <span className="text-[10px] font-bold text-slate-400 block uppercase">총 구매 금액</span>
-                              <span className="font-black text-emerald-600 text-sm">{b.totalAmount.toLocaleString()}원</span>
-                            </div>
+                            {showPrice && (
+                              <div className="text-right">
+                                <span className="text-[10px] font-bold text-slate-400 block uppercase">총 구매 금액</span>
+                                <span className="font-black text-emerald-600 text-sm">{b.totalAmount.toLocaleString()}원</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
