@@ -930,7 +930,7 @@ const ProductReleaseModal: React.FC<ProductReleaseModalProps> = ({ items, allUse
                 <textarea
                   value={smartPasteText}
                   onChange={e => setSmartPasteText(e.target.value)}
-                  placeholder={`네이버 스마트스토어 주문 상세 화면 전체를 복사(Ctrl+A -> Ctrl+C)한 후 여기에 붙여넣으세요 (Ctrl+V).\n\n[자동 감지 항목]\n• 대상자/고객명 (수취인명 또는 구매자명)\n• 아이디 (구매자 ID)\n• 연락처 (010-XXXX-XXXX)\n• 배송지 주소 (도로명/지번 전체 주소)`}
+                  placeholder={`네이버 스마트스토어 주문 상세 화면 전체를 복사(Ctrl+A -> Ctrl+C)한 후 여기에 붙여넣으세요 (Ctrl+V).\n\n[자동 감지 항목]\n• 대상자/고객명 (수취인명 또는 구매자명)\n• 아이디 (구매자 ID)\n• 연락처 (010-XXXX-XXXX / 2개인 경우 'A / B'로 자동 병합)\n• 배송지 주소 (2줄 이상 상세주소/건물명도 사이 띄움 후 전체 연결 입력)`}
                   rows={6}
                   autoFocus
                   className="w-full p-3.5 bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 rounded-xl font-mono text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all resize-none"
