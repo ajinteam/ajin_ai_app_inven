@@ -21,20 +21,35 @@ export interface ParsedOrderInfo {
   };
 }
 
-const KNOWN_LABEL_REGEX = /^(?:주문\s*상세정보|배송\s*정보|배송지\s*정보|상품주문번호|상품명|상품주문상태|클레임|수량클레임여부|구매확정연장상태|구매자명|구매자\s*ID|구매자ID|옵션|주문수량|초기주문수량|최종\s*상품금액|최초\s*상품금액|상품별\s*할인액|발송지연사유|당일발송여부|발송기한|예약구매여부|발송처리일|발주확인일|최초\s*집화처리일시|최종\s*집화처리일시|배송방법|배송완료일|출하일시|배송속성|택배사|배송상세상태|구매확정일|송장번호|오류송장등록사유|오류송장\s*등록일|개인통관고유부호|수취인명|수취인|받는분|받는사람|연락처1|연락처\s*1|연락처2|연락처\s*2|전화번호1|전화번호\s*1|전화번호2|전화번호\s*2|기타연락처|추가연락처|휴대폰|배송지|배송지\s*주소|배송주소|배송메모|배송\s*메모|요청사항|배송상세)$/i;
+// Section headers that should be skipped completely (e.g. "배송지 정보", "배송 정보")
+const SECTION_HEADER_REGEX = /^(?:주문\s*상세정보|주문정보|배송\s*정보|배송지\s*정보|수취인\s*정보|상품\s*정보|결제\s*정보|클레임\s*정보)$/i;
+
+// Known label tokens in order tables and forms
+const KNOWN_LABEL_REGEX = /^(?:주문\s*상세정보|배송\s*정보|배송지\s*정보|수취인\s*정보|상품\s*정보|결제\s*정보|정보|상세정보|배송조회|상품별\s*할인\s*상세정보|상품주문번호|상품명|상품주문상태|클레임|수량클레임여부|구매확정연장상태|구매자명|구매자\s*ID|구매자ID|옵션|주문수량|초기주문수량|최종\s*상품금액.*|최초\s*상품금액.*|상품별\s*할인액|발송지연사유|당일발송여부|발송기한|예약구매여부|발송처리일|발주확인일|최초\s*집화처리일시|최종\s*집화처리일시|배송방법|배송완료일|출하일시|배송속성|택배사|배송상세상태|구매확정일|송장번호|오류송장등록사유|오류송장\s*등록일|개인통관고유부호|수취인명|수취인|받는분|받는사람|연락처1|연락처\s*1|연락처2|연락처\s*2|전화번호1|전화번호\s*1|전화번호2|전화번호\s*2|기타연락처|추가연락처|휴대폰|배송지|배송지\s*주소|배송주소|배송메모|배송\s*메모|요청사항|배송상세)$/i;
 
 function isKnownLabel(str: string): boolean {
   if (!str) return false;
-  return KNOWN_LABEL_REGEX.test(str.trim());
+  const trimmed = str.trim();
+  if (trimmed === '정보' || trimmed === '상세정보' || trimmed === '배송조회') return true;
+  return KNOWN_LABEL_REGEX.test(trimmed);
 }
 
+// Detect if a line starts another field to stop multi-line address accumulation
 function isFieldBoundary(str: string): boolean {
   const trimmed = str.trim();
   if (!trimmed) return true;
+  if (SECTION_HEADER_REGEX.test(trimmed)) return true;
   if (isKnownLabel(trimmed)) return true;
-  // If line starts with a known label followed by colon or whitespace or tab
-  const firstWord = trimmed.split(/[\s:\t]/)[0]?.trim();
-  if (firstWord && isKnownLabel(firstWord)) return true;
+
+  // Specific boundary labels that clearly start another table cell or row
+  const boundaryKeywords = [
+    '배송메모', '배송 메모', '요청사항', '수취인명', '연락처1', '연락처2', '전화번호',
+    '택배사', '송장번호', '발송기한', '발송처리일', '상품명', '주문수량', '구매자명', '구매자 ID'
+  ];
+  for (const kw of boundaryKeywords) {
+    if (trimmed.startsWith(kw)) return true;
+  }
+
   return false;
 }
 
@@ -110,6 +125,12 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
+    // Skip section headers like "배송지 정보", "배송지\t정보", "주문 상세정보"
+    const normalizedHeaderCheck = line.replace(/[\t:]+/g, ' ').trim();
+    if (SECTION_HEADER_REGEX.test(normalizedHeaderCheck)) {
+      continue;
+    }
+
     // Handle tab-delimited cells from table copy
     const parts = line.split('\t').map(p => p.trim()).filter(Boolean);
     if (parts.length > 1) {
@@ -127,7 +148,7 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
           if (!phone1) phone1 = nextP;
         } else if (/^(?:연락처2|연락처\s*2|전화번호2|기타연락처|추가연락처)$/i.test(p) && nextP && !isKnownLabel(nextP)) {
           if (!phone2) phone2 = nextP;
-        } else if (/^(?:배송지|배송지\s*주소|배송주소)$/i.test(p) && nextP && !isKnownLabel(nextP)) {
+        } else if (/^(?:배송지|배송지\s*주소|배송주소)$/i.test(p) && nextP && !isKnownLabel(nextP) && nextP !== '정보') {
           if (addressParts.length === 0) {
             // Check if cell itself had internal linebreaks
             const subLines = nextP.split('\n').map(s => s.trim()).filter(Boolean);
@@ -183,7 +204,8 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
     }
 
     // Vertical Address collection (supports 1, 2, or more lines)
-    if (/^(?:배송지|배송지\s*주소|배송주소)[:\s]*$/i.test(line)) {
+    // Avoid triggering on "배송지 정보"
+    if (/^(?:배송지|배송지\s*주소|배송주소)[:\s]*$/i.test(line) && !line.includes('정보')) {
       if (addressParts.length === 0) {
         // Collect all non-boundary lines under 배송지
         for (let k = i + 1; k < lines.length; k++) {
@@ -195,11 +217,12 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
       }
     }
 
-    // Inline address (e.g. "배송지: 서울특별시 강남구 ...")
-    const inlineAddrMatch = line.match(/^(?:배송지|배송지\s*주소|배송주소)[\s:]+(.+)$/i);
+    // Inline address (e.g. "배송지: 서울특별시 강남구 ...", "배송지 (34917) 대전광역시...")
+    // Negative lookahead prevents matching section title "배송지 정보" or "배송지 조회"
+    const inlineAddrMatch = line.match(/^(?:배송지|배송지\s*주소|배송주소)[\s:]+(?!(?:정보|조회)\b)(.+)$/i);
     if (inlineAddrMatch && addressParts.length === 0) {
       const firstAddr = inlineAddrMatch[1].trim();
-      if (firstAddr && !isKnownLabel(firstAddr)) {
+      if (firstAddr && !isKnownLabel(firstAddr) && firstAddr !== '정보') {
         addressParts.push(firstAddr);
         // Collect subsequent lines if they are continuation of address (e.g. line 2 building name)
         for (let k = i + 1; k < lines.length; k++) {
@@ -270,7 +293,33 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
     if (m && m[1]) orderNumber = m[1].trim();
   }
 
-  // 3. Format phone numbers: If 2 contacts exist, format as "A / B"
+  // 3. Clean up address parts
+  // Filter out stray "정보" or other non-address labels
+  addressParts = addressParts
+    .map(p => p.trim())
+    .filter(p => Boolean(p) && p !== '정보' && !isKnownLabel(p));
+
+  // If no address was captured yet, search for Korean address lines in text
+  // Matches addresses starting with (optional zip code) and Korean province/metro: 서울, 대전, 경기, etc.
+  if (addressParts.length === 0) {
+    const koreanAddrRegex = /^(?:\(?\d{5}\)?\s*)?(?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)(?:특별시|광역시|특별자치시|특별자치도|도|시|군|구)?\s+[가-힣0-9\s\-]+(?:로|길|동|읍|면|리|가)\b/i;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (koreanAddrRegex.test(line)) {
+        addressParts.push(line);
+        // Check following line for apartment / suite / building continuation
+        for (let k = i + 1; k < lines.length; k++) {
+          const candidate = lines[k].trim();
+          if (!candidate || isFieldBoundary(candidate)) break;
+          addressParts.push(candidate);
+        }
+        break;
+      }
+    }
+  }
+
+  // 4. Format phone numbers: If 2 contacts exist, format as "A / B"
   const formatted1 = formatPhoneNumber(phone1);
   const formatted2 = formatPhoneNumber(phone2);
   let finalPhone = '';
@@ -281,7 +330,7 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
     finalPhone = formatted1 || formatted2 || '';
   }
 
-  // 4. Construct multi-line address: join all parts with a single space
+  // 5. Construct multi-line address: join all parts with a single space
   let finalAddress = '';
   if (addressParts.length > 0) {
     // If the first part is only a 5-digit zip code (e.g. "34917" or "(34917)"), format nicely
@@ -295,15 +344,14 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
     finalAddress = addressParts.join(' ').replace(/\s+/g, ' ').trim();
     // Clean trailing memo or status tags if accidentally captured
     finalAddress = finalAddress.replace(/(?:배송메모|배송상세|요청사항).*$/i, '').trim();
-  } else {
-    // Fallback single-line address regex
-    const m = text.match(/(?:배송지|배송지\s*주소|배송주소)[\s:\t]+([^\r\n\t]+)/i);
-    if (m && m[1] && !isKnownLabel(m[1].trim())) {
-      finalAddress = m[1].trim();
-    }
   }
 
-  // 5. Determine final recipient name
+  // Extra guard: If address ended up as "정보", clear it
+  if (finalAddress === '정보' || finalAddress.startsWith('정보 ')) {
+    finalAddress = finalAddress.replace(/^정보\s*/, '').trim();
+  }
+
+  // 6. Determine final recipient name
   const finalName = (recipientName || buyerName || '').trim();
 
   return {
