@@ -54,6 +54,17 @@ function isFieldBoundary(str: string): boolean {
 }
 
 /**
+ * Validate that a string or digit sequence is actually a valid Korean phone number
+ * (prevents 16-digit order numbers or random text from being recognized as phone)
+ */
+export function isValidKoreanPhone(raw: string): boolean {
+  if (!raw) return false;
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (digits.length < 9 || digits.length > 11) return false;
+  return /^(?:01[016789]\d{7,8}|02\d{7,8}|0[3-6][1-5]\d{7,8}|070\d{8})$/.test(digits);
+}
+
+/**
  * Standardize Korean phone number into standard hyphenated format (e.g. 010-1234-5678, 042-123-4567, 02-1234-5678)
  */
 export function formatPhoneNumber(raw: string): string {
@@ -145,9 +156,9 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
         } else if (/^(?:구매자\s*ID|구매자ID|주문자\s*ID|주문자ID|구매자\s*아이디|아이디)$/i.test(p) && nextP && !isKnownLabel(nextP)) {
           if (!buyerId) buyerId = nextP;
         } else if (/^(?:연락처1|연락처\s*1|수취인\s*연락처1?|전화번호1?|휴대폰)$/i.test(p) && nextP && !isKnownLabel(nextP)) {
-          if (!phone1) phone1 = nextP;
-        } else if (/^(?:연락처2|연락처\s*2|전화번호2|기타연락처|추가연락처)$/i.test(p) && nextP && !isKnownLabel(nextP)) {
-          if (!phone2) phone2 = nextP;
+          if (!phone1 && isValidKoreanPhone(nextP)) phone1 = nextP;
+        } else if (/^(?:연락처2|연락처\s*2|전화번호2|전화번호\s*2|기타연락처|추가연락처)$/i.test(p) && nextP && !isKnownLabel(nextP)) {
+          if (!phone2 && isValidKoreanPhone(nextP)) phone2 = nextP;
         } else if (/^(?:배송지|배송지\s*주소|배송주소)$/i.test(p) && nextP && !isKnownLabel(nextP) && nextP !== '정보') {
           if (addressParts.length === 0) {
             // Check if cell itself had internal linebreaks
@@ -193,12 +204,12 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
       }
     }
     if (/^(?:연락처1|연락처\s*1|수취인\s*연락처|휴대폰|전화번호1?)[:\s]*$/i.test(line) && nextLine) {
-      if (!phone1 && !isKnownLabel(nextLine)) {
+      if (!phone1 && !isKnownLabel(nextLine) && isValidKoreanPhone(nextLine)) {
         phone1 = nextLine;
       }
     }
-    if (/^(?:연락처2|연락처\s*2|기타연락처|추가연락처|전화번호2)[:\s]*$/i.test(line) && nextLine) {
-      if (!phone2 && !isKnownLabel(nextLine)) {
+    if (/^(?:연락처2|연락처\s*2|기타연락처|추가연락처|전화번호2|전화번호\s*2)[:\s]*$/i.test(line) && nextLine) {
+      if (!phone2 && !isKnownLabel(nextLine) && isValidKoreanPhone(nextLine)) {
         phone2 = nextLine;
       }
     }
@@ -265,26 +276,22 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
     if (m && m[1] && !isKnownLabel(m[1].trim())) buyerId = m[1].trim();
   }
   if (!phone1) {
-    const m = text.match(/(?:연락처1|연락처\s*1|수취인\s*연락처|휴대폰|전화번호1?)[\s:\t]+([0-9\-]{9,14})/i);
+    const m = text.match(/(?:연락처1|연락처\s*1|수취인\s*연락처|휴대폰|전화번호1?)[\s:\t]+(?<!\d)(01[016789]-?\d{3,4}-?\d{4}|02-?\d{3,4}-?\d{4}|0[3-6][1-5]-?\d{3,4}-?\d{4}|070-?\d{4}-?\d{4})(?!\d)/i);
     if (m && m[1]) phone1 = m[1].trim();
   }
   if (!phone2) {
-    const m = text.match(/(?:연락처2|연락처\s*2|기타연락처|추가연락처|전화번호2?)[\s:\t]+([0-9\-]{9,14})/i);
+    const m = text.match(/(?:연락처2|연락처\s*2|기타연락처|추가연락처|전화번호2|전화번호\s*2)[\s:\t]+(?<!\d)(01[016789]-?\d{3,4}-?\d{4}|02-?\d{3,4}-?\d{4}|0[3-6][1-5]-?\d{3,4}-?\d{4}|070-?\d{4}-?\d{4})(?!\d)/i);
     if (m && m[1]) phone2 = m[1].trim();
   }
 
-  // Generic mobile & landline phone search across text
-  const phonePattern = /(?:01[016789]|02|0[3-6][1-5]|070)-?\d{3,4}-?\d{4}/g;
-  const matchedPhones = (text.match(phonePattern) || []).map(p => formatPhoneNumber(p));
-  const uniquePhones = Array.from(new Set(matchedPhones.filter(Boolean)));
-
-  if (!phone1 && uniquePhones.length > 0) {
-    phone1 = uniquePhones[0];
-  }
-  if (!phone2 && uniquePhones.length > 0) {
-    const secondPhone = uniquePhones.find(p => p !== formatPhoneNumber(phone1));
-    if (secondPhone) {
-      phone2 = secondPhone;
+  // Generic mobile & landline phone search ONLY for phone1 fallback when phone1 was not found by any label.
+  // CRITICAL: Uses strict boundary assertions (?<!\d) and (?!\d) so substrings of 16-digit order numbers or dates are never matched!
+  // CRITICAL: phone2 is NEVER guessed from random page text; it must have an explicit label.
+  if (!phone1) {
+    const phonePattern = /(?<!\d)(?:01[016789]-?\d{3,4}-?\d{4}|02-?\d{3,4}-?\d{4}|0[3-6][1-5]-?\d{3,4}-?\d{4}|070-?\d{4}-?\d{4})(?!\d)/g;
+    const matchedPhones = text.match(phonePattern);
+    if (matchedPhones && matchedPhones.length > 0) {
+      phone1 = matchedPhones[0];
     }
   }
 
@@ -320,8 +327,8 @@ export function parseSmartOrderText(raw: string): ParsedOrderInfo {
   }
 
   // 4. Format phone numbers: If 2 contacts exist, format as "A / B"
-  const formatted1 = formatPhoneNumber(phone1);
-  const formatted2 = formatPhoneNumber(phone2);
+  const formatted1 = isValidKoreanPhone(phone1) ? formatPhoneNumber(phone1) : '';
+  const formatted2 = isValidKoreanPhone(phone2) ? formatPhoneNumber(phone2) : '';
   let finalPhone = '';
 
   if (formatted1 && formatted2 && formatted1 !== formatted2) {
