@@ -400,7 +400,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       }
     }
 
-    if (transactionType === 'release' && count > currentStock) { alert('재고 부족!'); return; }
+    if (transactionType === 'release' && customerName?.trim() !== '대천폐기' && count > currentStock) { alert('재고 부족!'); return; }
     
     if (isRange) {
       const baseTime = Date.now();
