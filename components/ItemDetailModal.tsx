@@ -112,6 +112,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [editFormData, setEditFormData] = useState<Partial<Item>>({});
   const [selectedTransIds, setSelectedTransIds] = useState<string[]>([]);
   const [priceType, setPriceType] = useState<'general' | 'agency'>('general');
+  const [syncSameBuyer, setSyncSameBuyer] = useState(true);
 
   const canEdit = useMemo(() => {
     if (authRole === 'admin') return true;
@@ -484,7 +485,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         const targetItem = allItems?.find(i => i.id === editTargetItemId);
         alert(`[${item.name}]에서 [${targetItem?.name || '선택한 제품'}] (으)로 내역이 성공적으로 이동되었습니다.\n수량 및 재고가 자동 재계산되었습니다.`);
       } else {
-        onUpdateTransaction(item.id, currentAction.targetId, updatedTransEditData, { syncBuyer: true });
+        onUpdateTransaction(item.id, currentAction.targetId, updatedTransEditData, { syncBuyer: syncSameBuyer });
       }
       setEditingTransactionId(null);
       setShowTransEditModal(null);
@@ -553,6 +554,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       remarks: userRemarks,
       historyRemarks: historyRemarks || t.historyRemarks
     });
+    setSyncSameBuyer(true);
   };
 
   const handleSaveTransEdit = (id: string) => {
@@ -1622,17 +1624,26 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
               {item.type === 'product' && (
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">구매자 및 배송 정보</span>
-                    {transEditData.customerUpdatedDate ? (
-                      <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                        최근 정보수정: {transEditData.customerUpdatedDate}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/60 pb-2 gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">구매자 및 배송 정보</span>
+                      {transEditData.customerUpdatedDate && (
+                        <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                          수정일: {transEditData.customerUpdatedDate}
+                        </span>
+                      )}
+                    </div>
+                    <label className="flex items-center gap-1.5 cursor-pointer bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs select-none">
+                      <input
+                        type="checkbox"
+                        checked={syncSameBuyer}
+                        onChange={e => setSyncSameBuyer(e.target.checked)}
+                        className="w-3.5 h-3.5 accent-indigo-600 rounded cursor-pointer"
+                      />
+                      <span className="text-[10px] font-black text-slate-700">
+                        {syncSameBuyer ? '동일 고객 전체 내역 함께 변경' : '이 건 1건만 단독 변경'}
                       </span>
-                    ) : (
-                      <span className="text-[9px] text-slate-400 font-medium">
-                        ※ 수정 시 동일 구매자 모든 구매내역 일괄 변경
-                      </span>
-                    )}
+                    </label>
                   </div>
 
                   <div>

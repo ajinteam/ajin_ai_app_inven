@@ -9,9 +9,13 @@ interface BuyerSearchModalProps {
   showPrice?: boolean;
   authRole?: 'admin' | 'product_only' | 'custom' | null;
   canViewRanking?: boolean;
+  onMergeBuyers?: (
+    targetCustomer: { customerName: string; userId?: string; phoneNumber?: string; address?: string },
+    sourceTransactionKeys: { itemId: string; transId: string }[]
+  ) => void;
 }
 
-const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, showPrice = false, authRole = null, canViewRanking = false }) => {
+const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, showPrice = false, authRole = null, canViewRanking = false, onMergeBuyers }) => {
   const [nameInput, setNameInput] = useState('');
   const [dateTerm, setDateTerm] = useState('');
   const [viewMode, setViewMode] = useState<'flat' | 'grouped' | 'byCode' | 'ranking'>('flat');
@@ -41,6 +45,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
   const [selectedBuyerKey, setSelectedBuyerKey] = useState<string | null>(null);
 
+  // Merge Buyer Modal State
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [targetMergeKey, setTargetMergeKey] = useState<string>('');
+  const [mergePassword, setMergePassword] = useState<string>('');
+
   // Reset pagination & filters on mode or search change
   useEffect(() => {
     setSelectedGroupDate('');
@@ -57,16 +66,30 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
   // Extract all release transactions from all products (cached)
   const allReleases = useMemo(() => {
-    // 1. Build lookup for linking orders with missing userId if same customerName and phone number exist with known userId
+    // Helper to normalize address for matching (removes spaces, punctuation, lowercase)
+    const normalizeAddr = (addr?: string) => {
+      if (!addr) return '';
+      return addr.replace(/[\s\-_,()]/g, '').toLowerCase();
+    };
+
+    // 1. Build lookup for linking orders with missing userId if same customerName and phone or address exist with known userId
     const phoneToUserId = new Map<string, string>();
+    const addrToUserId = new Map<string, string>();
+
     items.forEach(item => {
       item.transactions.forEach(t => {
         if (t.type === 'release' && !t.isDiscarded && !t.isReturned) {
           const c = (t.customerName || '').trim().toLowerCase();
           const u = (t.userId || '').trim();
           const p = (t.phoneNumber || '').replace(/\D/g, '');
-          if (c && u && p.length >= 7) {
-            phoneToUserId.set(`${c}::${p}`, u);
+          const a = normalizeAddr(t.address);
+          if (c && u) {
+            if (p.length >= 7) {
+              phoneToUserId.set(`${c}::${p}`, u);
+            }
+            if (a.length >= 8) {
+              addrToUserId.set(`${c}::${a.slice(0, 25)}`, u);
+            }
           }
         }
       });
@@ -93,12 +116,19 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           const cName = cust;
           const rawUid = (t.userId || '').trim();
           const phoneDigits = (t.phoneNumber || '').replace(/\D/g, '');
+          const normAddr = normalizeAddr(t.address);
           const addrClean = (t.address || '').replace(/\s+/g, ' ').trim();
 
           let resolvedUid = rawUid;
-          if (!resolvedUid && cName && phoneDigits.length >= 7) {
-            const linked = phoneToUserId.get(`${cName.toLowerCase()}::${phoneDigits}`);
-            if (linked) resolvedUid = linked;
+          if (!resolvedUid && cName) {
+            if (phoneDigits.length >= 7) {
+              const linked = phoneToUserId.get(`${cName.toLowerCase()}::${phoneDigits}`);
+              if (linked) resolvedUid = linked;
+            }
+            if (!resolvedUid && normAddr.length >= 8) {
+              const linkedAddr = addrToUserId.get(`${cName.toLowerCase()}::${normAddr.slice(0, 25)}`);
+              if (linkedAddr) resolvedUid = linkedAddr;
+            }
           }
 
           let buyerKey = '';
@@ -106,6 +136,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             buyerKey = `ID:${resolvedUid.toLowerCase()}`;
           } else if (cName && phoneDigits.length >= 4) {
             buyerKey = `PHONE:${cName.toLowerCase()}__${phoneDigits}`;
+          } else if (cName && normAddr.length >= 8) {
+            buyerKey = `ADDR:${cName.toLowerCase()}__${normAddr.slice(0, 25)}`;
           } else if (cName && addrClean) {
             buyerKey = `ADDR:${cName.toLowerCase()}__${addrClean.toLowerCase().slice(0, 30)}`;
           } else {
@@ -275,6 +307,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       totalAmount: number;
       lastPurchaseDate: string;
       customerUpdatedDate?: string;
+      transactionKeys: { itemId: string; transId: string }[];
     }>();
 
     matched.forEach(r => {
@@ -291,7 +324,8 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           totalQty: 0,
           totalAmount: 0,
           lastPurchaseDate: r.date ? new Date(r.date).toLocaleDateString() : '-',
-          customerUpdatedDate: r.customerUpdatedDate
+          customerUpdatedDate: r.customerUpdatedDate,
+          transactionKeys: []
         };
         map.set(k, b);
       }
@@ -310,10 +344,35 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       b.totalPurchases += 1;
       b.totalQty += r.quantity;
       b.totalAmount += r.quantity * (r.unitPrice || 0);
+      b.transactionKeys.push({ itemId: r.itemId, transId: r.id });
     });
 
     return Array.from(map.values());
   }, [allReleases, deferredNameInput]);
+
+  // Handle Buyer Merge Execution
+  const handleExecuteMerge = () => {
+    if (mergePassword !== 'aj5200') {
+      alert('비밀번호가 올바르지 않습니다.');
+      return;
+    }
+    if (!activeBuyerProfile || !targetMergeKey || !onMergeBuyers) return;
+    const target = matchingBuyers.find(b => b.key === targetMergeKey);
+    if (!target) return;
+
+    onMergeBuyers({
+      customerName: target.customerName,
+      userId: target.userId,
+      phoneNumber: target.phoneNumber !== '미등록' ? target.phoneNumber : undefined,
+      address: target.address !== '미등록' ? target.address : undefined
+    }, activeBuyerProfile.transactionKeys);
+
+    alert(`[${activeBuyerProfile.customerName}] 님의 ${activeBuyerProfile.totalPurchases}건 내역이 [${target.customerName}${target.userId ? ` (${target.userId})` : ''}] 님의 정보로 성공적으로 통합되었습니다.`);
+    setShowMergeModal(false);
+    setMergePassword('');
+    setTargetMergeKey('');
+    setSelectedBuyerKey(null);
+  };
 
   // Active Buyer Profile for Card Display
   const activeBuyerProfile = useMemo(() => {
@@ -794,15 +853,32 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                     </p>
                   </div>
                 </div>
-                {selectedBuyerKey && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBuyerKey(null)}
-                    className="text-xs font-black text-indigo-600 hover:text-indigo-800 bg-white px-3 py-1.5 rounded-xl border border-indigo-200 shadow-2xs shrink-0 self-start sm:self-auto cursor-pointer"
-                  >
-                    전체 내역 보기 ({matchingBuyers.reduce((s, b) => s + b.totalPurchases, 0)}건)
-                  </button>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedBuyerKey && onMergeBuyers && matchingBuyers.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const other = matchingBuyers.find(b => b.key !== selectedBuyerKey);
+                        setTargetMergeKey(other?.key || '');
+                        setMergePassword('');
+                        setShowMergeModal(true);
+                      }}
+                      className="text-xs font-black text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-xl border border-amber-300 shadow-2xs shrink-0 self-start sm:self-auto cursor-pointer flex items-center gap-1.5 transition-all"
+                      title="선택된 구매자 내역을 다른 구매자 정보로 합치기"
+                    >
+                      <span>🔗 다른 구매자와 통합</span>
+                    </button>
+                  )}
+                  {selectedBuyerKey && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBuyerKey(null)}
+                      className="text-xs font-black text-indigo-600 hover:text-indigo-800 bg-white px-3 py-1.5 rounded-xl border border-indigo-200 shadow-2xs shrink-0 self-start sm:self-auto cursor-pointer"
+                    >
+                      전체 내역 보기 ({matchingBuyers.reduce((s, b) => s + b.totalPurchases, 0)}건)
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Buyer Selector Pills */}
@@ -1783,6 +1859,119 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
           </div>
         </div>
       </div>
+
+      {/* Buyer Merge Modal */}
+      {showMergeModal && activeBuyerProfile && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-2xl border-2 border-amber-300 space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-xl shadow-md">
+                  🔗
+                </span>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">구매자 정보 통합 (합치기)</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">동일인이지만 아이디나 주소가 다르게 기록된 내역을 하나로 합칩니다.</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => { setShowMergeModal(false); setMergePassword(''); setTargetMergeKey(''); }}
+                className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Source info */}
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">통합 대상 (수정될 출고 건)</span>
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-slate-800 text-sm">{activeBuyerProfile.customerName}</span>
+                <span className="text-xs font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-lg">
+                  총 {activeBuyerProfile.totalPurchases}건 ({activeBuyerProfile.totalQty} EA)
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-500 space-y-0.5">
+                <p>아이디: <span className="font-mono font-bold text-slate-700">{activeBuyerProfile.userId || '(없음)'}</span></p>
+                <p>연락처: <span className="font-bold text-slate-700">{activeBuyerProfile.phoneNumber}</span></p>
+                <p>배송지: <span className="font-bold text-slate-700">{activeBuyerProfile.address}</span></p>
+              </div>
+            </div>
+
+            {/* Target choice */}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-700 block">
+                어떤 구매자의 정보로 통합(통일)하시겠습니까?
+              </label>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {matchingBuyers.filter(b => b.key !== activeBuyerProfile.key).map(b => (
+                  <label 
+                    key={b.key} 
+                    className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      targetMergeKey === b.key ? 'border-amber-500 bg-amber-50/60 shadow-xs' : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input 
+                      type="radio" 
+                      name="targetMerge" 
+                      value={b.key} 
+                      checked={targetMergeKey === b.key} 
+                      onChange={() => setTargetMergeKey(b.key)}
+                      className="mt-1 accent-amber-600"
+                    />
+                    <div className="flex-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-slate-900">{b.customerName}</span>
+                        <span className="text-[10px] font-bold text-indigo-600">{b.totalPurchases}건</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        ID: <span className="font-mono font-bold">{b.userId || '(없음)'}</span> | 📞 {b.phoneNumber}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">{b.address}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Password input */}
+            <div className="space-y-1.5 pt-1">
+              <label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                관리자 비밀번호 확인 (aj5200)
+              </label>
+              <input 
+                type="password"
+                value={mergePassword}
+                onChange={e => setMergePassword(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleExecuteMerge();
+                }}
+                placeholder="비밀번호 입력"
+                className="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-amber-500 outline-none font-bold text-sm"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => { setShowMergeModal(false); setMergePassword(''); setTargetMergeKey(''); }}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-xs transition-colors cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteMerge}
+                disabled={!targetMergeKey}
+                className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl font-black text-xs shadow-md transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                통합 완료하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

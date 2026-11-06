@@ -608,12 +608,32 @@ const App: React.FC = () => {
               return { ...t, ...updatedData, unitPrice: currentUnitPrice, customerUpdatedDate: todayStr };
             }
             // Same buyer release transactions (skip returned / resold / special items)
+            // STRICT IDENTIFICATION: Never overwrite distinct buyers who happen to share the same name!
             const tCust = (t.customerName || '').trim();
             const tUser = (t.userId || '').trim();
-            const isSameBuyer = t.type === 'release' && !t.isReturned && !t.isResold && !specialNames.includes(tCust) && (
-              (origCust !== '' && tCust === origCust) ||
-              (origUser !== '' && tUser === origUser)
-            );
+            const tPhone = (t.phoneNumber || '').replace(/\D/g, '');
+            const origPhone = (targetTrans?.phoneNumber || '').replace(/\D/g, '');
+            const tAddr = (t.address || '').replace(/[\s\-_,()]/g, '').toLowerCase();
+            const origAddr = (targetTrans?.address || '').replace(/[\s\-_,()]/g, '').toLowerCase();
+
+            let isSameBuyer = false;
+            if (t.type === 'release' && !t.isReturned && !t.isResold && !specialNames.includes(tCust)) {
+              if (origUser !== '') {
+                // If original had a userId, only sync transactions with the EXACT same userId!
+                isSameBuyer = (tUser.toLowerCase() === origUser.toLowerCase());
+              } else if (origCust !== '') {
+                // If original had NO userId, only sync if customerName matches AND phone or address matches
+                if (tCust === origCust) {
+                  if (origPhone && tPhone) {
+                    isSameBuyer = (origPhone === tPhone);
+                  } else if (origAddr.length >= 8 && tAddr.length >= 8) {
+                    isSameBuyer = (origAddr.slice(0, 20) === tAddr.slice(0, 20));
+                  } else if (!origPhone && !tPhone && !origAddr && !tAddr && tUser === '') {
+                    isSameBuyer = true;
+                  }
+                }
+              }
+            }
             if (isSameBuyer) {
               const updatedBuyerTrans: Partial<Transaction> = { ...customerSyncData };
               if (updatedData.priceType !== undefined) {
@@ -639,6 +659,31 @@ const App: React.FC = () => {
         return item;
       });
     });
+  };
+
+  const handleMergeBuyers = (
+    targetCustomer: { customerName: string; userId?: string; phoneNumber?: string; address?: string },
+    sourceTransactionKeys: { itemId: string; transId: string }[]
+  ) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const sourceSet = new Set(sourceTransactionKeys.map(s => `${s.itemId}::${s.transId}`));
+
+    setItems(prev => prev.map(item => ({
+      ...item,
+      transactions: item.transactions.map(t => {
+        if (sourceSet.has(`${item.id}::${t.id}`)) {
+          return {
+            ...t,
+            customerName: targetCustomer.customerName || t.customerName,
+            userId: targetCustomer.userId !== undefined ? targetCustomer.userId : t.userId,
+            phoneNumber: targetCustomer.phoneNumber !== undefined ? targetCustomer.phoneNumber : t.phoneNumber,
+            address: targetCustomer.address !== undefined ? targetCustomer.address : t.address,
+            customerUpdatedDate: todayStr
+          };
+        }
+        return t;
+      })
+    })));
   };
 
   const handleMoveTransaction = (
@@ -1524,6 +1569,7 @@ const App: React.FC = () => {
           showPrice={showPrice}
           authRole={authRole}
           canViewRanking={currentUser?.id === 'admin' || currentUser?.buyerRankingPermission === true}
+          onMergeBuyers={handleMergeBuyers}
         />
       )}
       {showUserManagementModal && (
