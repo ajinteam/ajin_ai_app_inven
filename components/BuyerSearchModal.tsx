@@ -35,7 +35,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   const [cameFromRanking, setCameFromRanking] = useState<{
     previousNameInput: string;
     previousDateTerm: string;
+    targetBuyerKey?: string;
+    targetBuyerLabel?: string;
   } | null>(null);
+
+  const [selectedBuyerKey, setSelectedBuyerKey] = useState<string | null>(null);
 
   // Reset pagination & filters on mode or search change
   useEffect(() => {
@@ -53,7 +57,30 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
 
   // Extract all release transactions from all products (cached)
   const allReleases = useMemo(() => {
-    const releases: (Transaction & { itemId: string, itemName: string, itemBrand: string, itemCode: string, unitPrice: number })[] = [];
+    // 1. Build lookup for linking orders with missing userId if same customerName and phone number exist with known userId
+    const phoneToUserId = new Map<string, string>();
+    items.forEach(item => {
+      item.transactions.forEach(t => {
+        if (t.type === 'release' && !t.isDiscarded && !t.isReturned) {
+          const c = (t.customerName || '').trim().toLowerCase();
+          const u = (t.userId || '').trim();
+          const p = (t.phoneNumber || '').replace(/\D/g, '');
+          if (c && u && p.length >= 7) {
+            phoneToUserId.set(`${c}::${p}`, u);
+          }
+        }
+      });
+    });
+
+    const releases: (Transaction & { 
+      itemId: string; 
+      itemName: string; 
+      itemBrand: string; 
+      itemCode: string; 
+      unitPrice: number;
+      buyerKey: string;
+    })[] = [];
+
     items.forEach(item => {
       item.transactions.forEach(t => {
         if (t.type === 'release' && !t.isDiscarded && !t.isReturned) {
@@ -62,9 +89,33 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             return;
           }
           const { userRemarks } = extractRemarksAndHistory(t);
+
+          const cName = cust;
+          const rawUid = (t.userId || '').trim();
+          const phoneDigits = (t.phoneNumber || '').replace(/\D/g, '');
+          const addrClean = (t.address || '').replace(/\s+/g, ' ').trim();
+
+          let resolvedUid = rawUid;
+          if (!resolvedUid && cName && phoneDigits.length >= 7) {
+            const linked = phoneToUserId.get(`${cName.toLowerCase()}::${phoneDigits}`);
+            if (linked) resolvedUid = linked;
+          }
+
+          let buyerKey = '';
+          if (resolvedUid) {
+            buyerKey = `ID:${resolvedUid.toLowerCase()}`;
+          } else if (cName && phoneDigits.length >= 4) {
+            buyerKey = `PHONE:${cName.toLowerCase()}__${phoneDigits}`;
+          } else if (cName && addrClean) {
+            buyerKey = `ADDR:${cName.toLowerCase()}__${addrClean.toLowerCase().slice(0, 30)}`;
+          } else {
+            buyerKey = cName ? `NAME:${cName.toLowerCase()}` : (resolvedUid ? `ID:${resolvedUid.toLowerCase()}` : 'UNKNOWN');
+          }
+
           releases.push({
             ...t,
             itemId: item.id,
+            buyerKey,
             remarks: userRemarks || (t.historyRemarks ? '' : t.remarks),
             itemName: item.name,
             itemBrand: item.category || '-',
@@ -114,17 +165,17 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     const query = deferredNameInput.toLowerCase().trim();
     const dateMatch = dateTerm.trim(); // YYYY-MM-DD or YYYY or YYYY-MM
 
-    if (!query && !dateMatch) {
-      return allReleases;
-    }
+    let list = allReleases;
 
-    const queryDigits = query.replace(/\D/g, '');
-    const isOnlyDigits = /^\d+$/.test(query);
-    const isSerialPrefixQuery = /^AJ[PD]/i.test(query);
+    // If an individual buyer was chosen (e.g. from ranking click or multi-buyer selector)
+    if (selectedBuyerKey) {
+      list = list.filter(r => r.buyerKey === selectedBuyerKey);
+    } else if (query !== '') {
+      const queryDigits = query.replace(/\D/g, '');
+      const isOnlyDigits = /^\d+$/.test(query);
+      const isSerialPrefixQuery = /^AJ[PD]/i.test(query);
 
-    return allReleases.filter(r => {
-      let matchesQuery = true;
-      if (query !== '') {
+      list = list.filter(r => {
         const cust = (r.customerName || '').toLowerCase().trim();
         const uid = (r.userId || '').toLowerCase().trim();
         const serial = (r.serialNumber || '').toLowerCase().trim();
@@ -133,65 +184,57 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
         const phoneDigits = phoneRaw.replace(/\D/g, '');
 
         if (isSerialPrefixQuery) {
-          // Explicit serial query (e.g. AJP03489, AJD00105) -> ONLY match serial number
-          matchesQuery = serial.includes(query);
+          return serial.includes(query);
         } else if (isOnlyDigits) {
           if (queryDigits.length === 4) {
-            // Exactly 4 digits (e.g. '0202', '5200') -> STRICTLY Phone number last 4 digits only!
-            // Prevents mixing with partial serial numbers like AJD00202 or AJP02020!
             const phoneParts = phoneRaw.split(/[\/,]/);
-            matchesQuery = phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits));
+            return phoneParts.some(p => p.replace(/\D/g, '').endsWith(queryDigits));
           } else if (queryDigits.length === 5) {
-            // Exactly 5 digits (e.g. '00202', '02020', '03489') -> STRICTLY 5-digit serial number!
-            matchesQuery = serialDigits === queryDigits || serial.includes(query);
+            return serialDigits === queryDigits || serial.includes(query);
           } else if (queryDigits.length >= 7) {
-            // 7~11 digits -> Full phone number query
-            matchesQuery = phoneDigits.includes(queryDigits);
+            return phoneDigits.includes(queryDigits);
           } else {
-            // 1~3 digits -> Exact integer serial number match or endsWith
             const serialNum = parseInt(serialDigits, 10);
             const qNum = parseInt(queryDigits, 10);
             const serialMatch = (!isNaN(serialNum) && !isNaN(qNum) && serialNum === qNum) || serialDigits.endsWith(queryDigits);
             const uidMatch = uid.includes(query);
-            matchesQuery = serialMatch || uidMatch;
+            return serialMatch || uidMatch;
           }
         } else {
-          // Text/Name query (e.g. '박지성', '김준식', '홍성민', 'MULTY_AX')
-          // STRICT MATCH: ONLY matches current customerName, userId, or serialNumber
-          matchesQuery = cust.includes(query) || uid.includes(query) || serial.includes(query);
+          return cust.includes(query) || uid.includes(query) || serial.includes(query);
         }
-      }
-      
-      let matchesDate = true;
-      if (dateMatch !== '') {
+      });
+    }
+
+    if (dateMatch !== '') {
+      list = list.filter(r => {
         const dateObj = new Date(r.date);
         const yyyy = dateObj.getFullYear();
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
         const dd = String(dateObj.getDate()).padStart(2, '0');
         const localDateStr = isNaN(yyyy) ? r.date.split('T')[0] : `${yyyy}-${mm}-${dd}`;
-        matchesDate = localDateStr.startsWith(dateMatch);
-      }
+        return localDateStr.startsWith(dateMatch);
+      });
+    }
 
-      return matchesQuery && matchesDate;
-    });
-  }, [allReleases, deferredNameInput, dateTerm]);
+    return list;
+  }, [allReleases, deferredNameInput, dateTerm, selectedBuyerKey]);
 
   // Sliced Releases for Instant 0.01s Render Performance
   const visibleReleases = useMemo(() => {
     return filteredReleases.slice(0, visibleCount);
   }, [filteredReleases, visibleCount]);
 
-  // Box A: Searched Buyer Profile Card
-  const searchedBuyerProfile = useMemo(() => {
+  // Group matching buyers for the searched term (without selectedBuyerKey constraint)
+  const matchingBuyers = useMemo(() => {
     const query = deferredNameInput.trim().toLowerCase();
-    if (!query) return null;
+    if (!query) return [];
 
     const queryDigits = query.replace(/\D/g, '');
     const isOnlyDigits = /^\d+$/.test(query);
     const isSerialPrefixQuery = /^AJ[PD]/i.test(query);
 
-    // Strict matching with current buyer only
-    const matching = allReleases.filter(r => {
+    const matched = allReleases.filter(r => {
       const cust = (r.customerName || '').toLowerCase().trim();
       const uid = (r.userId || '').toLowerCase().trim();
       const serial = (r.serialNumber || '').toLowerCase().trim();
@@ -219,30 +262,70 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
       }
     });
 
-    if (matching.length === 0) return null;
+    if (matched.length === 0) return [];
 
-    // Find latest non-empty phone and address for this buyer
-    const withPhone = matching.find(r => !!r.phoneNumber?.trim());
-    const withAddress = matching.find(r => !!r.address?.trim());
-    const latest = matching[0];
+    const map = new Map<string, {
+      key: string;
+      customerName: string;
+      userId?: string;
+      phoneNumber: string;
+      address: string;
+      totalPurchases: number;
+      totalQty: number;
+      totalAmount: number;
+      lastPurchaseDate: string;
+      customerUpdatedDate?: string;
+    }>();
 
-    const totalAmount = matching.reduce((sum, r) => sum + (r.quantity * (r.unitPrice || 0)), 0);
-    const totalQty = matching.reduce((sum, r) => sum + r.quantity, 0);
+    matched.forEach(r => {
+      const k = r.buyerKey || 'UNKNOWN';
+      let b = map.get(k);
+      if (!b) {
+        b = {
+          key: k,
+          customerName: r.customerName || (r.userId ? `아이디: ${r.userId}` : '미지정'),
+          userId: r.userId || undefined,
+          phoneNumber: r.phoneNumber?.trim() || '미등록',
+          address: r.address?.trim() || '미등록',
+          totalPurchases: 0,
+          totalQty: 0,
+          totalAmount: 0,
+          lastPurchaseDate: r.date ? new Date(r.date).toLocaleDateString() : '-',
+          customerUpdatedDate: r.customerUpdatedDate
+        };
+        map.set(k, b);
+      }
+      if (b.phoneNumber === '미등록' && r.phoneNumber?.trim()) {
+        b.phoneNumber = r.phoneNumber.trim();
+      }
+      if (b.address === '미등록' && r.address?.trim()) {
+        b.address = r.address.trim();
+      }
+      if (!b.userId && r.userId?.trim()) {
+        b.userId = r.userId.trim();
+      }
+      if (!b.customerUpdatedDate && r.customerUpdatedDate) {
+        b.customerUpdatedDate = r.customerUpdatedDate;
+      }
+      b.totalPurchases += 1;
+      b.totalQty += r.quantity;
+      b.totalAmount += r.quantity * (r.unitPrice || 0);
+    });
 
-    return {
-      customerName: latest.customerName || (latest.userId ? `아이디: ${latest.userId}` : '미지정'),
-      userId: latest.userId,
-      phoneNumber: withPhone?.phoneNumber?.trim() || '미등록',
-      address: withAddress?.address?.trim() || '미등록',
-      totalPurchases: matching.length,
-      totalQty,
-      totalAmount,
-      lastPurchaseDate: latest.date ? new Date(latest.date).toLocaleDateString() : '-',
-      customerUpdatedDate: latest.customerUpdatedDate
-    };
-  }, [deferredNameInput, allReleases]);
+    return Array.from(map.values());
+  }, [allReleases, deferredNameInput]);
 
-  // Unified Buyer Rankings by Customer Name (Calculated whenever ranking permission is available)
+  // Active Buyer Profile for Card Display
+  const activeBuyerProfile = useMemo(() => {
+    if (matchingBuyers.length === 0) return null;
+    if (matchingBuyers.length === 1) return matchingBuyers[0];
+    if (selectedBuyerKey) {
+      return matchingBuyers.find(b => b.key === selectedBuyerKey) || null;
+    }
+    return null;
+  }, [matchingBuyers, selectedBuyerKey]);
+
+  // Unified Buyer Rankings by Buyer Key (Calculated whenever ranking permission is available)
   const buyerRankings = useMemo(() => {
     if (!canAccessRanking) return [];
 
@@ -275,10 +358,10 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     }>();
 
     periodFiltered.forEach(r => {
+      const key = r.buyerKey;
+      if (!key || key === 'UNKNOWN') return;
       const cName = (r.customerName || '').trim();
       const uId = (r.userId || '').trim();
-      const key = cName || (uId ? `ID_${uId}` : 'UNKNOWN');
-      if (key === 'UNKNOWN') return;
 
       let buyer = buyerMap.get(key);
       if (!buyer) {
@@ -362,14 +445,11 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
     });
   }, [buyerRankings, deferredNameInput]);
 
-  // Rank info for the currently searched buyer in profile card
-  const searchedBuyerRankInfo = useMemo(() => {
-    if (!canAccessRanking || !searchedBuyerProfile || buyerRankings.length === 0) return null;
-    return buyerRankings.find(b => 
-      (b.customerName && searchedBuyerProfile.customerName && b.customerName.toLowerCase().trim() === searchedBuyerProfile.customerName.toLowerCase().trim()) ||
-      (b.userId && searchedBuyerProfile.userId && b.userId.toLowerCase().trim() === searchedBuyerProfile.userId.toLowerCase().trim())
-    );
-  }, [canAccessRanking, searchedBuyerProfile, buyerRankings]);
+  // Rank info for the active buyer in profile card
+  const activeBuyerRankInfo = useMemo(() => {
+    if (!canAccessRanking || !activeBuyerProfile || buyerRankings.length === 0) return null;
+    return buyerRankings.find(b => b.key === activeBuyerProfile.key) || null;
+  }, [canAccessRanking, activeBuyerProfile, buyerRankings]);
 
   const totalSalesAmount = useMemo(() => {
     return filteredReleases.reduce((sum, r) => {
@@ -425,12 +505,15 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   }, [viewMode, filteredReleases]);
 
   // Click on Ranking [내역 보기] -> Navigate to Flat list with precise filter
-  const handleViewBuyerDetailsFromRanking = (customerName: string) => {
+  const handleViewBuyerDetailsFromRanking = (b: { key: string; customerName: string; userId?: string }) => {
     setCameFromRanking({
       previousNameInput: nameInput,
       previousDateTerm: dateTerm,
+      targetBuyerKey: b.key,
+      targetBuyerLabel: b.customerName + (b.userId ? ` (${b.userId})` : '')
     });
-    setNameInput(customerName);
+    setNameInput(b.customerName);
+    setSelectedBuyerKey(b.key);
     if (rankingPeriod === 'year' && selectedRankingYear) {
       setDateTerm(selectedRankingYear);
     } else if (rankingPeriod === 'month' && selectedRankingMonth) {
@@ -552,10 +635,14 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   ref={searchInputRef}
                   type="text" 
                   value={nameInput} 
-                  onChange={e => setNameInput(e.target.value)} 
+                  onChange={e => {
+                    setNameInput(e.target.value);
+                    setSelectedBuyerKey(null);
+                  }} 
                   onKeyDown={e => {
                     if (e.key === 'Escape') {
                       setNameInput('');
+                      setSelectedBuyerKey(null);
                     }
                   }}
                   autoComplete="off"
@@ -569,6 +656,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                     type="button"
                     onClick={() => {
                       setNameInput('');
+                      setSelectedBuyerKey(null);
                       searchInputRef.current?.focus();
                     }} 
                     className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 font-bold text-base cursor-pointer transition-colors"
@@ -668,7 +756,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 <span className="text-2xl">🏆</span>
                 <div>
                   <p className="text-xs sm:text-sm font-black text-slate-900">
-                    구매자 순위에서 <span className="text-indigo-600 font-extrabold">[{nameInput || '선택한 고객'}]</span>님의 출고 내역을 확인 중입니다
+                    구매자 순위에서 <span className="text-indigo-600 font-extrabold">[{cameFromRanking.targetBuyerLabel || nameInput || '선택한 고객'}]</span>님의 출고 내역을 확인 중입니다
                   </p>
                   <p className="text-[10px] text-slate-500 font-medium">
                     내역 확인 후 아래 버튼을 누르면 이전 순위 목록 및 검색 조건으로 바로 복귀합니다.
@@ -680,6 +768,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 onClick={() => {
                   setNameInput(cameFromRanking.previousNameInput);
                   setDateTerm(cameFromRanking.previousDateTerm);
+                  setSelectedBuyerKey(null);
                   setCameFromRanking(null);
                   setViewMode('ranking');
                 }}
@@ -690,8 +779,89 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             </div>
           )}
 
+          {/* Multi-buyer selector banner when 2 or more distinct buyers match the search */}
+          {matchingBuyers.length > 1 && viewMode !== 'ranking' && (
+            <div className="bg-gradient-to-r from-amber-50/90 via-sky-50/70 to-indigo-50/80 border-2 border-indigo-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3 animate-fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">👥</span>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900">
+                      동명이인 / 다중 구매자 검색 (<span className="text-indigo-600 font-extrabold">{matchingBuyers.length}명</span>)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      아이디나 주소가 다른 동명이인이 검색되었습니다. 특정 구매자를 선택하시면 개별 순위 및 내역을 조회할 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+                {selectedBuyerKey && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBuyerKey(null)}
+                    className="text-xs font-black text-indigo-600 hover:text-indigo-800 bg-white px-3 py-1.5 rounded-xl border border-indigo-200 shadow-2xs shrink-0 self-start sm:self-auto cursor-pointer"
+                  >
+                    전체 내역 보기 ({matchingBuyers.reduce((s, b) => s + b.totalPurchases, 0)}건)
+                  </button>
+                )}
+              </div>
+
+              {/* Buyer Selector Pills */}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedBuyerKey(null)}
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                    !selectedBuyerKey
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  <span>전체 내역</span>
+                  <span className="text-[10px] opacity-80">({matchingBuyers.reduce((s, b) => s + b.totalPurchases, 0)}건)</span>
+                </button>
+
+                {matchingBuyers.map((b, idx) => {
+                  const isSelected = selectedBuyerKey === b.key;
+                  const addrShort = b.address && b.address !== '미등록'
+                    ? b.address.split(' ').slice(0, 2).join(' ')
+                    : '';
+                  return (
+                    <button
+                      key={b.key}
+                      type="button"
+                      onClick={() => setSelectedBuyerKey(b.key)}
+                      className={`px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300'
+                          : 'bg-white text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 shadow-2xs'
+                      }`}
+                    >
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${isSelected ? 'bg-white text-indigo-600' : 'bg-indigo-100 text-indigo-700'}`}>
+                        {idx + 1}
+                      </span>
+                      <span className="font-extrabold">{b.customerName}</span>
+                      {b.userId && (
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
+                          {b.userId}
+                        </span>
+                      )}
+                      {addrShort && (
+                        <span className="text-[10px] opacity-75">
+                          ({addrShort})
+                        </span>
+                      )}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isSelected ? 'bg-indigo-500 text-white' : 'bg-amber-50 text-amber-700'}`}>
+                        {b.totalPurchases}건
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Profile Card */}
-          {searchedBuyerProfile && (
+          {activeBuyerProfile && viewMode !== 'ranking' && (
             <div className="bg-gradient-to-r from-indigo-50/90 via-sky-50/70 to-slate-50 border-2 border-indigo-200 rounded-2xl p-4 sm:p-5 shadow-sm animate-fade-in">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex items-start sm:items-center gap-3.5">
@@ -701,30 +871,30 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-base sm:text-lg font-black text-slate-900">
-                        {searchedBuyerProfile.customerName}
+                        {activeBuyerProfile.customerName}
                       </span>
-                      {searchedBuyerProfile.userId && (
+                      {activeBuyerProfile.userId && (
                         <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-black uppercase rounded-lg border border-indigo-200">
-                          {searchedBuyerProfile.userId}
+                          {activeBuyerProfile.userId}
                         </span>
                       )}
-                      {searchedBuyerProfile.customerUpdatedDate && (
+                      {activeBuyerProfile.customerUpdatedDate && (
                         <span className="px-2 py-0.5 bg-white text-indigo-600 text-[10px] font-bold rounded-md border border-indigo-100 shadow-2xs">
-                          수정일: {searchedBuyerProfile.customerUpdatedDate}
+                          수정일: {activeBuyerProfile.customerUpdatedDate}
                         </span>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 mt-1.5 text-xs text-slate-700">
                       <div className="flex items-center gap-1.5">
                         <span className="font-black text-slate-400">📞 연락처:</span>
-                        <span className={`font-bold ${searchedBuyerProfile.phoneNumber !== '미등록' ? 'text-indigo-700 font-mono font-black' : 'text-slate-400'}`}>
-                          {searchedBuyerProfile.phoneNumber}
+                        <span className={`font-bold ${activeBuyerProfile.phoneNumber !== '미등록' ? 'text-indigo-700 font-mono font-black' : 'text-slate-400'}`}>
+                          {activeBuyerProfile.phoneNumber}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="font-black text-slate-400">🏠 배송지 주소:</span>
-                        <span className={`font-bold ${searchedBuyerProfile.address !== '미등록' ? 'text-slate-900 font-extrabold' : 'text-slate-400'}`}>
-                          {searchedBuyerProfile.address}
+                        <span className={`font-bold ${activeBuyerProfile.address !== '미등록' ? 'text-slate-900 font-extrabold' : 'text-slate-400'}`}>
+                          {activeBuyerProfile.address}
                         </span>
                       </div>
                     </div>
@@ -732,14 +902,14 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-indigo-100 flex-wrap">
-                  {canAccessRanking && searchedBuyerRankInfo && (
+                  {canAccessRanking && activeBuyerRankInfo && (
                     <div className="bg-white px-3.5 py-2 rounded-xl border border-amber-200 shadow-2xs text-right">
                       <span className="text-[10px] font-bold text-amber-600 block uppercase">
                         {rankingPeriod === 'all' ? '전체 순위' : rankingPeriod === 'year' ? `${selectedRankingYear}년 순위` : `${selectedRankingMonth} 순위`}
                       </span>
                       <span className="text-xs sm:text-sm font-black text-slate-800 flex items-center justify-end gap-1">
-                        <span>{searchedBuyerRankInfo.originalRank === 1 ? '🥇' : searchedBuyerRankInfo.originalRank === 2 ? '🥈' : searchedBuyerRankInfo.originalRank === 3 ? '🥉' : '🏆'}</span>
-                        <span className="text-indigo-600 font-extrabold">{searchedBuyerRankInfo.originalRank}위</span>
+                        <span>{activeBuyerRankInfo.originalRank === 1 ? '🥇' : activeBuyerRankInfo.originalRank === 2 ? '🥈' : activeBuyerRankInfo.originalRank === 3 ? '🥉' : '🏆'}</span>
+                        <span className="text-indigo-600 font-extrabold">{activeBuyerRankInfo.originalRank}위</span>
                         <span className="text-[10px] text-slate-400 font-medium">/ {buyerRankings.length}명</span>
                       </span>
                     </div>
@@ -747,14 +917,14 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                   <div className="bg-white px-3.5 py-2 rounded-xl border border-indigo-100 shadow-2xs text-right">
                     <span className="text-[10px] font-bold text-slate-400 block uppercase">총 구매 내역</span>
                     <span className="text-xs sm:text-sm font-black text-slate-800">
-                      {searchedBuyerProfile.totalPurchases}건 ({searchedBuyerProfile.totalQty.toLocaleString()} EA)
+                      {activeBuyerProfile.totalPurchases}건 ({activeBuyerProfile.totalQty.toLocaleString()} EA)
                     </span>
                   </div>
                   {showPrice && (
                     <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-100 shadow-2xs text-right">
                       <span className="text-[10px] font-bold text-slate-400 block uppercase">누적 구매 금액</span>
                       <span className="text-xs sm:text-sm font-black text-emerald-600">
-                        {searchedBuyerProfile.totalAmount.toLocaleString()}원
+                        {activeBuyerProfile.totalAmount.toLocaleString()}원
                       </span>
                     </div>
                   )}
@@ -959,7 +1129,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               </div>
                             </div>
                             <button
-                              onClick={() => handleViewBuyerDetailsFromRanking(b.customerName)}
+                              onClick={() => handleViewBuyerDetailsFromRanking(b)}
                               className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl font-black text-xs hover:bg-indigo-600 hover:text-white transition-all cursor-pointer"
                             >
                               내역 조회
@@ -1073,7 +1243,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                               </td>
                               <td className="px-6 py-5 text-center">
                                 <button
-                                  onClick={() => handleViewBuyerDetailsFromRanking(b.customerName)}
+                                  onClick={() => handleViewBuyerDetailsFromRanking(b)}
                                   className="px-3.5 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-2xs cursor-pointer"
                                 >
                                   내역 보기
