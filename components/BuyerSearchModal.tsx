@@ -354,7 +354,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
   const handleExecuteMerge = () => {
     const cleanPass = mergePassword.trim().toLowerCase();
     if (cleanPass !== 'aj5200') {
-      alert('마스터 비밀번호가 올바르지 않습니다.');
+      alert('관리자 비밀번호가 올바르지 않습니다.');
       return;
     }
     if (!activeBuyerProfile || !targetMergeKey || !onMergeBuyers) return;
@@ -1939,7 +1939,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
             {/* Password input */}
             <div className="space-y-1.5 pt-1">
               <label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">
-                마스터 비밀번호 확인
+                관리자 비밀번호 확인
               </label>
               <input 
                 type="password"
@@ -1948,7 +1948,7 @@ const BuyerSearchModal: React.FC<BuyerSearchModalProps> = ({ items, onClose, sho
                 onKeyDown={e => {
                   if (e.key === 'Enter') handleExecuteMerge();
                 }}
-                placeholder="마스터 비밀번호 입력"
+                placeholder="관리자 비밀번호 입력"
                 className="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-amber-500 outline-none font-bold text-sm"
               />
             </div>
